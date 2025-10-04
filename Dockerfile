@@ -8,9 +8,14 @@ WORKDIR /app
 COPY ./requirements.txt .
 
 # Instalar las dependencias de Python
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el resto del código de la aplicación
-# (En realidad, usaremos un volumen para desarrollo,
-# pero esto es necesario para la construcción inicial y para producción)
 COPY . .
+
+# Expone el puerto que la aplicación usará dentro del contenedor
+EXPOSE 10000
+
+# Comando para ejecutar la aplicación cuando el contenedor se inicie
+# Render pasará la variable $PORT con el valor 10000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
