@@ -1,8 +1,15 @@
+# mot_back/requirements.txt
+
 fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg2-binary
-passlib[bcrypt]
+
+# Adaptamos las versiones a las que tu entorno puede encontrar.
+# Esta combinación es estable y compatible.
+passlib==1.7.4
+bcrypt==3.2.0
+
 python-jose[cryptography]
 pydantic-settings
 pydantic[email]
