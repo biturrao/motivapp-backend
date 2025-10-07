@@ -1,5 +1,3 @@
-# mot_back/app/models/user_profile.py
-
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from typing import Optional
@@ -11,16 +9,14 @@ class UserProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     
-    # --- Campos del Perfil ---
     name: str = Column(String, index=True)
     age: Optional[int] = Column(Integer, nullable=True)
-    institution: Optional[str] = Column(String, nullable=True) # Dónde estudia
-    major: Optional[str] = Column(String, nullable=True)      # Qué estudia
+    institution: Optional[str] = Column(String, nullable=True)
+    major: Optional[str] = Column(String, nullable=True)
     
-    # Usamos Booleanos para preguntas de sí/no
-    on_medication: Optional[bool] = Column(Boolean(), nullable=True)
-    has_learning_difficulties: Optional[bool] = Column(Boolean(), nullable=True)
+    # --- CAMPOS MODIFICADOS ---
+    on_medication: Optional[str] = Column(String, nullable=True)
+    has_learning_difficulties: Optional[str] = Column(String, nullable=True)
 
-    # --- Relación con el Usuario ---
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     owner = relationship("User", back_populates="profile")
