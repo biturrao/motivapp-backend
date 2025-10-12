@@ -5,6 +5,7 @@ from typing import Optional
 class UserProfileBase(BaseModel):
     name: Optional[str] = None
     age: Optional[int] = None
+    institution: Optional[str] = None # <-- LÍNEA AÑADIDA
     major: Optional[str] = None
     entry_year: Optional[int] = None
     course_types: Optional[str] = None

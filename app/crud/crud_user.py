@@ -12,28 +12,35 @@ def create_user(db: Session, user: UserCreate) -> User:
     """
     Crea un nuevo usuario y su perfil asociado en una sola transacción.
     """
-    # 1. Preparar el objeto de usuario
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
         hashed_password=hashed_password
     )
     db.add(db_user)
-    db.flush()  # Usa flush para asignar un ID a db_user sin terminar la transacción
+    db.flush()
 
-    # 2. Preparar el objeto de perfil usando el ID del nuevo usuario
+    # --- CÓDIGO CORREGIDO: AÑADIMOS TODOS LOS CAMPOS NUEVOS ---
     profile_data = UserProfile(
         user_id=db_user.id,
         name=user.name,
         age=user.age,
         institution=user.institution,
         major=user.major,
-        on_medication=user.on_medication,
-        has_learning_difficulties=user.has_learning_difficulties,
+        entry_year=user.entry_year,
+        course_types=user.course_types,
+        family_responsibilities=user.family_responsibilities,
+        is_working=user.is_working,
+        mental_health_support=user.mental_health_support,
+        mental_health_details=user.mental_health_details,
+        chronic_condition=user.chronic_condition,
+        chronic_condition_details=user.chronic_condition_details,
+        neurodivergence=user.neurodivergence,
+        neurodivergence_details=user.neurodivergence_details,
+        preferred_support_types=user.preferred_support_types,
     )
     db.add(profile_data)
     
-    # 3. Guarda todo en la base de datos a la vez
     db.commit()
     db.refresh(db_user)
     return db_user
