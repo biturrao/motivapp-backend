@@ -42,3 +42,14 @@ def get_questionnaire_summary_data(
     return summary
 
     return results
+
+@router.get("/streak", response_model=dict)
+def get_user_streak_endpoint(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    Obtiene la racha de check-ins consecutivos del usuario actual.
+    """
+    streak = crud_dashboard.get_user_streak(db=db, user_id=current_user.id)
+    return {"streak": streak}
