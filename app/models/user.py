@@ -1,10 +1,7 @@
-# mot_back/app/models/user.py
-
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, Index
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-# Importamos el nuevo modelo para poder referenciarlo
 from .user_profile import UserProfile 
 
 class User(Base):
@@ -15,9 +12,16 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean(), default=True)
 
+    # --- CAMBIO: Añadimos el campo de rol ---
+    # Por defecto, cualquier usuario nuevo será un "student"
+    # Los psicólogos tendrán el rol "psychologist"
+    role = Column(String, index=True, default="student", nullable=False)
+
     # Relación inversa con las respuestas
     answers = relationship("Answer", back_populates="user")
     
-    # --- LÍNEA AÑADIDA ---
     # Conecta este usuario con su perfil
     profile = relationship("UserProfile", back_populates="owner", uselist=False)
+
+# Añadimos un índice explícito para la columna 'role' si no lo hicimos en Column
+Index('ix_users_role', User.role)

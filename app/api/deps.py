@@ -35,7 +35,12 @@ def get_current_user(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         email: str = payload.get("sub")
-        if email is None:
+        
+        # --- CAMBIO: Validar que el token tenga la estructura esperada ---
+        # Obtenemos el rol del token. Si no existe, es un token inválido/antiguo.
+        role: str = payload.get("role")
+        if email is None or role is None:
+        # --- Fin del cambio ---
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -43,4 +48,26 @@ def get_current_user(
     user = crud_user.get_user_by_email(db, email=email)
     if user is None:
         raise credentials_exception
+    
+    # Nos aseguramos de que el rol en la DB coincida con el del token
+    # (por si el rol del usuario cambió pero el token sigue siendo antiguo)
+    if user.role != role:
+        raise credentials_exception
+
     return user
+
+# --- CAMBIO: Nueva dependencia para proteger rutas de psicólogos ---
+def get_current_psychologist_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Dependencia que obtiene el usuario actual y verifica si es un psicólogo.
+    Si no lo es, lanza un error 403 Forbidden.
+    """
+    if current_user.role != "psychologist":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos suficientes para acceder a este recurso."
+        )
+    return current_user
+# --- Fin del cambio ---

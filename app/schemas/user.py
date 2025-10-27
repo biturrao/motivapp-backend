@@ -4,8 +4,11 @@ from typing import Optional
 class UserBase(BaseModel):
     email: EmailStr
 
-# --- Schema para la creación de un usuario (lo que la API recibe) ---
-# ESTA ES LA CLASE CORREGIDA
+# --- Schema para la creación de un Psicólogo (simple) ---
+class PsychologistCreate(UserBase):
+    password: str
+
+# --- Schema para la creación de un Alumno (tu schema original) ---
 class UserCreate(UserBase):
     password: str
     name: str
@@ -28,6 +31,7 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
     is_active: bool
+    role: str  # <-- CAMBIO: Añadimos el rol
 
     class Config:
-        from_attributes = True
+        from_attributes = True # Reemplaza 'orm_mode = True'
