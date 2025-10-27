@@ -15,13 +15,10 @@ class User(Base):
     # --- CAMBIO: Añadimos el campo de rol ---
     # Por defecto, cualquier usuario nuevo será un "student"
     # Los psicólogos tendrán el rol "psychologist"
-    role = Column(String, index=True, default="student", nullable=False)
+    role = Column(String, default="student", nullable=False)
 
     # Relación inversa con las respuestas
     answers = relationship("Answer", back_populates="user")
     
     # Conecta este usuario con su perfil
     profile = relationship("UserProfile", back_populates="owner", uselist=False)
-
-# Añadimos un índice explícito para la columna 'role' si no lo hicimos en Column
-Index('ix_users_role', User.role)
