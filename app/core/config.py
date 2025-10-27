@@ -9,6 +9,6 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
-
+    PSYCHOLOGIST_INVITE_KEY: str
 # Creamos una instancia única de la configuración
 settings = Settings()

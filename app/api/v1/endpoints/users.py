@@ -19,6 +19,7 @@ def register_new_user(
 ):
     """
     Crea un nuevo usuario ALUMNO (student) y devuelve un token.
+    (Esta función no tiene cambios de seguridad)
     """
     user = crud_user.get_user_by_email(db, email=user_in.email)
     if user:
@@ -40,16 +41,28 @@ def register_new_user(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-# --- CAMBIO: Nuevo endpoint para registrar psicólogos ---
+# --- CAMBIO: Endpoint de psicólogos actualizado con seguridad ---
 @router.post("/register-psychologist", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register_new_psychologist(
     *,
     db: Session = Depends(deps.get_db),
-    user_in: PsychologistCreate
+    user_in: PsychologistCreate # <-- El schema ahora contiene 'invite_key'
 ):
     """
     Crea un nuevo usuario PSICÓLOGO (admin) y devuelve un token.
+    Ahora está protegido por una llave de invitación.
     """
+    
+    # --- INICIO DE LA LÓGICA DE SEGURIDAD ---
+    # Comparamos la llave del frontend con la llave guardada en Render
+    if user_in.invite_key != settings.PSYCHOLOGIST_INVITE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Llave de invitación incorrecta.",
+        )
+    # --- FIN DE LA LÓGICA DE SEGURIDAD ---
+
+    # Si la llave es correcta, procedemos a crear el usuario
     user = crud_user.get_user_by_email(db, email=user_in.email)
     if user:
         raise HTTPException(
@@ -57,7 +70,12 @@ def register_new_psychologist(
             detail="El email ya está registrado.",
         )
     
-    user = crud_user.create_psychologist_user(db, user=user_in)
+    # Corregimos la llamada a la función CRUD
+    user = crud_user.create_psychologist_user(
+        db, 
+        email=user_in.email, 
+        password=user_in.password
+    )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
@@ -67,4 +85,3 @@ def register_new_psychologist(
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
-# --- Fin del cambio ---

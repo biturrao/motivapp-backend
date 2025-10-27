@@ -4,11 +4,11 @@ from typing import Optional
 class UserBase(BaseModel):
     email: EmailStr
 
-# --- Schema para la creación de un Psicólogo (simple) ---
+# --- Schema para la creación de un Psicólogo
 class PsychologistCreate(UserBase):
     password: str
-
-# --- Schema para la creación de un Alumno (tu schema original) ---
+    invite_key: str
+# --- Schema para la creación de un Alumno
 class UserCreate(UserBase):
     password: str
     name: str
@@ -27,11 +27,11 @@ class UserCreate(UserBase):
     neurodivergence_details: Optional[str] = None
     preferred_support_types: Optional[str] = None
 
-# --- Schema para leer un usuario (lo que la API devuelve) ---
+# --- Schema para leer un usuario
 class UserRead(UserBase):
     id: int
     is_active: bool
-    role: str  # <-- CAMBIO: Añadimos el rol
+    role: str
 
     class Config:
-        from_attributes = True # Reemplaza 'orm_mode = True'
+        from_attributes = True
