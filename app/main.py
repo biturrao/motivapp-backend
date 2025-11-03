@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.base import Base 
 from app.db.session import engine, SessionLocal
@@ -31,6 +32,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MetaMotivation API", version="1.0.0", lifespan=lifespan)
 
+origins = [
+    "*",  # El comodín '*' permite peticiones de CUALQUIER origen.
+    # Para producción, podrías ser más específico:
+    # "http://localhost",
+    # "http://localhost:8081",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite todas las cabeceras
+)
 # Routers
 app.include_router(login_endpoints.router, prefix="/api/v1", tags=["Login"])
 app.include_router(user_endpoints.router, prefix="/api/v1/users", tags=["Users"])
