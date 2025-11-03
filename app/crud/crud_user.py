@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-
+from typing import List
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from app.models.user_profile import UserProfile
@@ -47,8 +47,7 @@ def create_user(db: Session, user: UserCreate) -> User:
     db.refresh(db_user)
     return db_user
 
-# --- CAMBIO IMPORTANTE AQUÍ ---
-# La firma de la función ahora coincide con la forma en que la llama el endpoint.
+
 def create_psychologist_user(db: Session, email: str, password: str) -> User:
     """
     Crea un nuevo usuario PSICÓLOGO.
@@ -66,7 +65,6 @@ def create_psychologist_user(db: Session, email: str, password: str) -> User:
     db.commit()
     db.refresh(db_user)
     return db_user
-# --- Fin del cambio ---
 
 def authenticate_user(db: Session, email: str, password: str) -> User | None:
     # (Esta función no cambia)
@@ -77,3 +75,8 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
         return None
     return user
 
+def get_all_students(db: Session) -> List[User]:
+    """
+    Obtiene una lista de todos los usuarios que tienen el rol 'student'.
+    """
+    return db.query(User).filter(User.role == 'student').all()

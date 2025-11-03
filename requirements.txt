@@ -14,3 +14,5 @@ python-jose[cryptography]
 pydantic-settings
 pydantic[email]
 python-multipart
+
+google-generativeai 

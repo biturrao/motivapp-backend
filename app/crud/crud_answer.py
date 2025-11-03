@@ -1,6 +1,5 @@
-# mot_back/app/crud/crud_answer.py
-
-from sqlalchemy.orm import Session
+# app/crud/crud_answer.py
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from app.models.answer import Answer
@@ -22,3 +21,15 @@ def save_user_answers(db: Session, *, user_id: int, answers_in: List[AnswerCreat
     
     db.add_all(db_answers)
     db.commit()
+
+def get_answers_by_user_id(db: Session, *, user_id: int) -> List[Answer]:
+    """
+    Obtiene todas las respuestas de un usuario específico, incluyendo
+    el texto de la pregunta asociada (cargado eficientemente).
+    """
+    return (
+        db.query(Answer)
+        .filter(Answer.user_id == user_id)
+        .options(joinedload(Answer.question)) # Carga la relación 'question'
+        .all()
+    )
