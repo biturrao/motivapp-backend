@@ -8,9 +8,9 @@ class Section(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), index=True, nullable=False)
-    description = Column(Text)
-    order = Column(Integer, nullable=False, default=0)  # Order in the path (1, 2, 3, 4)
-    icon_name = Column(String(50))  # Icon identifier for frontend
+    description = Column(Text, nullable=True)
+    order = Column(Integer, nullable=True, default=0)  # Order in the path (1, 2, 3, 4)
+    icon_name = Column(String(50), nullable=True)  # Icon identifier for frontend
     
     # Relationships
     questions = relationship("Question", back_populates="section")

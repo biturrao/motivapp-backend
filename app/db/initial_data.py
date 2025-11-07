@@ -1,5 +1,6 @@
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import text, inspect
 
 from app.models.section import Section
 from app.models.question import Question
@@ -45,10 +46,44 @@ seed_data = {
     }
 }
 
+def migrate_section_table(db: Session):
+    """
+    Add new columns to sections table if they don't exist.
+    This is a manual migration for backward compatibility.
+    """
+    try:
+        inspector = inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('sections')]
+        
+        # Add missing columns
+        if 'description' not in columns:
+            logger.info("Adding 'description' column to sections table...")
+            db.execute(text("ALTER TABLE sections ADD COLUMN description TEXT"))
+            db.commit()
+        
+        if 'order' not in columns:
+            logger.info("Adding 'order' column to sections table...")
+            db.execute(text("ALTER TABLE sections ADD COLUMN \"order\" INTEGER DEFAULT 0"))
+            db.commit()
+        
+        if 'icon_name' not in columns:
+            logger.info("Adding 'icon_name' column to sections table...")
+            db.execute(text("ALTER TABLE sections ADD COLUMN icon_name VARCHAR(50)"))
+            db.commit()
+        
+        logger.info("Section table migration completed.")
+    except Exception as e:
+        logger.error(f"Error during section table migration: {e}")
+        db.rollback()
+
+
 def seed_db(db: Session):
     """
     Siembra la base de datos con las secciones y preguntas iniciales.
     """
+    # First, run migration to add new columns if needed
+    migrate_section_table(db)
+    
     # Comprueba si ya existen datos para no duplicar
     first_section = db.query(Section).first()
     if first_section:
