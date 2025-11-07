@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.models.section import Section
 from app.models.question import Question
+from app.models.content import Content, ContentType
+from app.models.lesson import Lesson
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -73,4 +75,126 @@ def seed_db(db: Session):
     # Confirma todas las preguntas agregadas
     db.commit()
     logger.info("Siembra de la base de datos completada.")
+    
+    # Seed path sections
+    seed_path_sections(db)
+
+
+def seed_path_sections(db: Session):
+    """
+    Seeds the learning path sections with their contents and lessons.
+    Sections: Iniciar, Autoregulación, Creencias, Señales Internas
+    """
+    logger.info("Sembrando secciones del path de aprendizaje...")
+    
+    # Check if path sections already exist
+    existing_path_section = db.query(Section).filter(Section.name == "Iniciar").first()
+    if existing_path_section:
+        logger.info("Las secciones del path ya existen. Saltando siembra.")
+        return
+    
+    # Define path sections
+    path_sections = [
+        {
+            "name": "Iniciar",
+            "description": "Fundamentos del entrenamiento de la mente y habilidades básicas",
+            "order": 1,
+            "icon_name": "compass"
+        },
+        {
+            "name": "Autoregulación",
+            "description": "Desarrolla habilidades de autorregulación emocional y motivacional",
+            "order": 2,
+            "icon_name": "brain"
+        },
+        {
+            "name": "Creencias",
+            "description": "Explora y modifica creencias sobre tu capacidad de cambio",
+            "order": 3,
+            "icon_name": "lightbulb"
+        },
+        {
+            "name": "Señales Internas",
+            "description": "Aprende a identificar y responder a señales internas de motivación",
+            "order": 4,
+            "icon_name": "heart"
+        }
+    ]
+    
+    # Create sections with sample contents and lessons
+    for section_data in path_sections:
+        section = Section(
+            name=section_data["name"],
+            description=section_data["description"],
+            order=section_data["order"],
+            icon_name=section_data["icon_name"]
+        )
+        db.add(section)
+        db.commit()
+        db.refresh(section)
+        
+        # Add sample contents for each section
+        sample_contents = [
+            {
+                "title": f"Introducción a {section_data['name']}",
+                "description": f"Contenido teórico sobre {section_data['name']}",
+                "content_type": ContentType.VIDEO,
+                "content_url": f"https://example.com/videos/{section_data['name'].lower()}_intro.mp4",
+                "duration_minutes": 5,
+                "order": 1
+            },
+            {
+                "title": f"Fundamentos de {section_data['name']}",
+                "description": f"Lectura fundamental sobre {section_data['name']}",
+                "content_type": ContentType.TEXT,
+                "content_url": f"https://example.com/texts/{section_data['name'].lower()}_fundamentos",
+                "duration_minutes": 10,
+                "order": 2
+            }
+        ]
+        
+        for content_data in sample_contents:
+            content = Content(
+                section_id=section.id,
+                title=content_data["title"],
+                description=content_data["description"],
+                content_type=content_data["content_type"],
+                content_url=content_data["content_url"],
+                duration_minutes=content_data["duration_minutes"],
+                order=content_data["order"]
+            )
+            db.add(content)
+        
+        # Add sample lessons for each section
+        sample_lessons = [
+            {
+                "title": f"Lección 1: Primeros pasos en {section_data['name']}",
+                "description": f"Primera lección práctica de {section_data['name']}",
+                "content_url": f"https://example.com/lessons/{section_data['name'].lower()}_lesson1",
+                "duration_minutes": 15,
+                "order": 1
+            },
+            {
+                "title": f"Lección 2: Práctica avanzada de {section_data['name']}",
+                "description": f"Segunda lección de {section_data['name']}",
+                "content_url": f"https://example.com/lessons/{section_data['name'].lower()}_lesson2",
+                "duration_minutes": 20,
+                "order": 2
+            }
+        ]
+        
+        for lesson_data in sample_lessons:
+            lesson = Lesson(
+                section_id=section.id,
+                title=lesson_data["title"],
+                description=lesson_data["description"],
+                content_url=lesson_data["content_url"],
+                duration_minutes=lesson_data["duration_minutes"],
+                order=lesson_data["order"]
+            )
+            db.add(lesson)
+    
+    db.commit()
+    logger.info("Siembra de secciones del path completada.")
+
 

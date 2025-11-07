@@ -22,3 +22,9 @@ class User(Base):
     
     # Conecta este usuario con su perfil
     profile = relationship("UserProfile", back_populates="owner", uselist=False)
+    
+    # Path progress relationships
+    content_progress = relationship("UserContentProgress", back_populates="user", cascade="all, delete-orphan")
+    lesson_progress = relationship("UserLessonProgress", back_populates="user", cascade="all, delete-orphan")
+    section_progress = relationship("UserSectionProgress", back_populates="user", cascade="all, delete-orphan")
+
