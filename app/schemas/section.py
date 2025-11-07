@@ -1,7 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional, List
-from app.schemas.content import ContentWithProgress
-from app.schemas.lesson import LessonWithProgress
+from typing import Optional, List, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.schemas.content import ContentWithProgress
+    from app.schemas.lesson import LessonWithProgress
 
 
 class SectionBase(BaseModel):
@@ -30,8 +32,8 @@ class Section(SectionBase):
 
 
 class SectionWithProgress(Section):
-    contents: List[ContentWithProgress] = []
-    lessons: List[LessonWithProgress] = []
+    contents: List[Any] = []  # Will be ContentWithProgress
+    lessons: List[Any] = []   # Will be LessonWithProgress
     completed_contents: int = 0
     total_contents: int = 0
     completed_lessons: int = 0
