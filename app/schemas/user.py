@@ -35,3 +35,15 @@ class UserRead(UserBase):
 
     class Config:
         from_attributes = True
+
+
+# Alias para compatibilidad
+User = UserRead
+
+
+# --- Schema para actualizar un usuario
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+    role: Optional[str] = None

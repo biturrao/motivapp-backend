@@ -28,3 +28,7 @@ class AnswerRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Alias para compatibilidad
+Answer = AnswerRead

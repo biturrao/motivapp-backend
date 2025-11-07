@@ -10,3 +10,7 @@ class DailyCheckInRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Alias para compatibilidad
+DailyCheckIn = DailyCheckInRead
