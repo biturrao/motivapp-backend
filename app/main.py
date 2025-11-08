@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 from app.db.base import Base 
 from app.db.session import engine, SessionLocal
@@ -16,23 +17,56 @@ from app.api.v1.endpoints import dashboard as dashboard_endpoints
 from app.api.v1.endpoints import profile as profile_endpoints
 from app.api.v1.endpoints import path as path_endpoints
 
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Iniciando aplicación y creando tablas...")
-    Base.metadata.create_all(bind=engine)
-    
-    db = SessionLocal()
+    logger.info("🚀 Iniciando aplicación y creando tablas...")
     try:
-        seed_db(db)
-    finally:
-        db.close()
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Tablas creadas exitosamente")
+        
+        db = SessionLocal()
+        try:
+            seed_db(db)
+            logger.info("✅ Datos iniciales cargados")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"❌ Error durante el inicio: {str(e)}")
+        raise
     
     yield
     
-    print("Apagando aplicación...")
+    logger.info("👋 Apagando aplicación...")
 
-app = FastAPI(title="MetaMotivation API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="MetaMotivation API", 
+    version="1.0.0", 
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc"
+)
 
+# Configuración CORS para Azure
+# Ajusta los orígenes según tus necesidades
+origins = [
+    "http://localhost:8081",  # Expo local
+    "http://localhost:19006",  # Expo web
+    "https://motivapp-api-h3eke6d2endmftfb.brazilsouth-01.azurewebsites.net",  # Tu backend Azure
+    "https://*.azurewebsites.net",  # Otros servicios Azure
+    "*",  # En producción, reemplaza esto con tu dominio específico del frontend
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Routers
 app.include_router(login_endpoints.router, prefix="/api/v1", tags=["Login"])
@@ -42,6 +76,19 @@ app.include_router(check_in_endpoints.router, prefix="/api/v1/check-in", tags=["
 app.include_router(dashboard_endpoints.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(profile_endpoints.router, prefix="/api/v1", tags=["Profile"])
 app.include_router(path_endpoints.router, prefix="/api/v1/path", tags=["Path"])
+
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the MetaMotivation API!"}
+    return {
+        "message": "Welcome to the MetaMotivation API!",
+        "status": "online",
+        "environment": "Azure App Service"
+    }
+
+@app.get("/health")
+def health_check():
+    """Endpoint de health check para Azure"""
+    return {
+        "status": "healthy",
+        "service": "MetaMotivation API"
+    }

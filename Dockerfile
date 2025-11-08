@@ -13,9 +13,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el resto del código de la aplicación
 COPY . .
 
-# Expone el puerto que la aplicación usará dentro del contenedor
-EXPOSE 10000
+# Azure App Service usa el puerto 8000 por defecto
+EXPOSE 8000
+
+# Copiar y dar permisos al script de inicio
+COPY startup.sh /app/startup.sh
+RUN chmod +x /app/startup.sh
 
 # Comando para ejecutar la aplicación cuando el contenedor se inicie
-# Render pasará la variable $PORT con el valor 10000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
+# Azure Web App ejecutará este comando
+CMD ["/app/startup.sh"]
