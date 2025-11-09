@@ -139,6 +139,25 @@ POST /api/v1/path/section/progress
 }
 ```
 
+### 7. Obtener Racha del Path
+```
+GET /api/v1/dashboard/path-streak
+```
+**Descripción:** Calcula los días consecutivos que el usuario ha accedido al path (contenidos o lecciones).
+
+**Respuesta:**
+```json
+{
+  "streak": 5
+}
+```
+
+**Lógica:**
+- Se considera un día de uso si el usuario accedió a cualquier contenido o lección ese día
+- La racha se cuenta desde hoy hacia atrás
+- Si no hubo acceso hoy ni ayer, la racha es 0
+- Se basa en los campos `last_accessed` de `user_content_progress` y `user_lesson_progress`
+
 ## Modelos de Base de Datos
 
 ### Tabla: sections

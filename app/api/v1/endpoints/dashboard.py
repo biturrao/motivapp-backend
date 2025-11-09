@@ -54,6 +54,19 @@ def get_user_streak_endpoint(
     streak = crud_dashboard.get_user_streak(db=db, user_id=current_user.id)
     return {"streak": streak}
 
+
+@router.get("/path-streak", response_model=dict)
+def get_path_streak_endpoint(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    Obtiene la racha de días consecutivos usando el path (contenidos o lecciones).
+    """
+    streak = crud_dashboard.get_path_streak(db=db, user_id=current_user.id)
+    return {"streak": streak}
+
+
 @router.get("/admin/user/{user_id}/motivation-history", response_model=List[DailyCheckInRead])
 def get_user_motivation_history(
     *,
