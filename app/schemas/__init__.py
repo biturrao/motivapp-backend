@@ -12,3 +12,8 @@ from .user_progress import (
     UserSectionProgress, UserSectionProgressCreate,
     PathOverview
 )
+from .chat import (
+    ChatMessage, ChatMessageCreate, ChatRequest, ChatResponse, 
+    ChatHistoryResponse, ProfileSummaryRequest, ProfileSummaryResponse
+)
+

@@ -16,6 +16,7 @@ from app.api.v1.endpoints import check_in as check_in_endpoints
 from app.api.v1.endpoints import dashboard as dashboard_endpoints
 from app.api.v1.endpoints import profile as profile_endpoints
 from app.api.v1.endpoints import path as path_endpoints
+from app.api.v1.endpoints import ai_chat as ai_chat_endpoints
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -76,6 +77,7 @@ app.include_router(check_in_endpoints.router, prefix="/api/v1/check-in", tags=["
 app.include_router(dashboard_endpoints.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(profile_endpoints.router, prefix="/api/v1", tags=["Profile"])
 app.include_router(path_endpoints.router, prefix="/api/v1/path", tags=["Path"])
+app.include_router(ai_chat_endpoints.router, prefix="/api/v1/ai-chat", tags=["AI Chat"])
 
 @app.get("/")
 def read_root():

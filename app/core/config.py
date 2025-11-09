@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Psychologist Invite
     PSYCHOLOGIST_INVITE_KEY: str
     
+    # Google Gemini API
+    GEMINI_API_KEY: str
+    
     # Azure específico
     SCM_DO_BUILD_DURING_DEPLOYMENT: Optional[str] = None
     

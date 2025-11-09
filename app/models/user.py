@@ -30,4 +30,7 @@ class User(Base):
     
     # Refresh tokens relationship
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    
+    # Chat messages relationship
+    chat_messages = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
 
