@@ -39,3 +39,15 @@ def get_check_ins_by_user_id(db: Session, *, user_id: int) -> List[DailyCheckIn]
         .order_by(DailyCheckIn.date.asc())
         .all()
     )
+
+
+def get_latest_checkin(db: Session, user_id: int) -> DailyCheckIn:
+    """
+    Obtiene el último check-in de motivación de un usuario.
+    """
+    return (
+        db.query(DailyCheckIn)
+        .filter(DailyCheckIn.user_id == user_id)
+        .order_by(DailyCheckIn.date.desc())
+        .first()
+    )
