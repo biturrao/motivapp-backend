@@ -27,4 +27,7 @@ class User(Base):
     content_progress = relationship("UserContentProgress", back_populates="user", cascade="all, delete-orphan")
     lesson_progress = relationship("UserLessonProgress", back_populates="user", cascade="all, delete-orphan")
     section_progress = relationship("UserSectionProgress", back_populates="user", cascade="all, delete-orphan")
+    
+    # Refresh tokens relationship
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
 

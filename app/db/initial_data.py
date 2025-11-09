@@ -6,6 +6,7 @@ from app.models.section import Section
 from app.models.question import Question
 from app.models.content import Content, ContentType
 from app.models.lesson import Lesson
+from app.models.refresh_token import RefreshToken  # Importar para que SQLAlchemy cree la tabla
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

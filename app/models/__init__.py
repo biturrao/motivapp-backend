@@ -6,4 +6,5 @@ from .daily_check_in import DailyCheckIn
 from .content import Content, ContentType
 from .lesson import Lesson
 from .user_progress import UserContentProgress, UserLessonProgress, UserSectionProgress
+from .refresh_token import RefreshToken
 
