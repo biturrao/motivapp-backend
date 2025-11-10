@@ -36,7 +36,7 @@ def build_user_context(db: Session, user: User) -> str:
             context_string += f"Su último check-in de motivación fue de {last_checkin.motivation_level} sobre 6. "
         
         # Obtener resumen del cuestionario
-        summary = get_questionnaire_summary(db, user.id)
+        summary = get_questionnaire_summary(db, user_id=user.id)
         if summary:
             context_string += "Su resumen del cuestionario de meta-motivación es: "
             summary_parts = [f"{s['section_name']} con un promedio de {s['average_score']:.1f} sobre 7" for s in summary]
