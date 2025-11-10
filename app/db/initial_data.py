@@ -90,32 +90,34 @@ def seed_db(db: Session):
     # Comprueba si ya existen datos para no duplicar
     first_section = db.query(Section).first()
     if first_section:
-        logger.info("La base de datos ya contiene datos iniciales. Saltando siembra.")
-        return
-
-    logger.info("Sembrando la base de datos con secciones y preguntas...")
-    
-    # Crea un mapa para acceder fácilmente a los objetos de sección
-    section_map = {}
-    for section_name in seed_data["sections"]:
-        # Crea y guarda la sección
-        section = Section(name=section_name)
-        db.add(section)
-        db.commit()
-        db.refresh(section)
-        section_map[section_name] = section
+        logger.info("La base de datos ya contiene datos iniciales. Saltando siembra de secciones.")
+    else:
+        logger.info("Sembrando la base de datos con secciones y preguntas...")
         
-        # Itera sobre las preguntas de esa sección
-        for question_text in seed_data["questions"].get(section_name, []):
-            question = Question(text=question_text, section_id=section.id)
-            db.add(question)
+        # Crea un mapa para acceder fácilmente a los objetos de sección
+        section_map = {}
+        for section_name in seed_data["sections"]:
+            # Crea y guarda la sección
+            section = Section(name=section_name)
+            db.add(section)
+            db.commit()
+            db.refresh(section)
+            section_map[section_name] = section
+            
+            # Itera sobre las preguntas de esa sección
+            for question_text in seed_data["questions"].get(section_name, []):
+                question = Question(text=question_text, section_id=section.id)
+                db.add(question)
+        
+        # Confirma todas las preguntas agregadas
+        db.commit()
+        logger.info("Siembra de la base de datos completada.")
+        
+        # Seed path sections
+        seed_path_sections(db)
     
-    # Confirma todas las preguntas agregadas
-    db.commit()
-    logger.info("Siembra de la base de datos completada.")
-    
-    # Seed path sections
-    seed_path_sections(db)
+    # Seed wellness exercises (siempre intentar, tiene su propia verificación)
+    seed_wellness_exercises(db)
 
 
 def seed_path_sections(db: Session):
