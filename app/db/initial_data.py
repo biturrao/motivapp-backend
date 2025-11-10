@@ -255,268 +255,76 @@ def seed_wellness_exercises(db: Session):
     
     exercises_data = [
         {
-            "name": "¿Qué Siento? 60s",
-            "objective": "Pasar de confusión difusa a identificación corporal y etiqueta emocional/metamotivacional",
-            "context": "Sentado",
-            "duration_seconds": 75,
-            "recommended_state": ExerciseState.CUALQUIERA,
-            "taxonomy": "Conciencia interoceptiva; etiquetado afectivo; señales→hipótesis regulables",
-            "body_systems": "Sensaciones viscerales, tensión muscular, respiración",
-            "steps": json.dumps([
-                "Marca 1–2 zonas en la silueta corporal (frente/dorso)",
-                "Elige cualidad: presión/calor/tensión/cosquilleo/vacío",
-                "Valora intensidad 0–10 y etiqueta emoción + sentimiento metamotivacional",
-                "Nombra el posible gatillo (frase corta)"
-            ]),
-            "voice_scripts": json.dumps([
-                "Localiza dónde lo sientes en tu cuerpo",
-                "Ponle nombre a la sensación y a la emoción",
-                "Observa una exhalación larga antes de seguir"
-            ]),
-            "measurement_notes": "Intensidad y valencia pre/post; zonas y cualidades; etiqueta elegida",
-            "ux_notes": "Silueta interactiva; lista de etiquetas con buscador; círculo 60s; audio guía; hápticos suaves",
-            "safeguards": "Si intensidad ≥8/10 repetida, mostrar recursos de apoyo"
-        },
-        {
-            "name": "RND-60",
-            "objective": "Interrumpir reactividad, etiquetar sensación/emoción y definir un siguiente micro‑paso",
-            "context": "Sentado",
-            "duration_seconds": 60,
-            "recommended_state": ExerciseState.AMBAR,
-            "taxonomy": "Exhalación prolongada; etiquetado; intención orientada",
-            "body_systems": "Respiración; lenguaje interno; intención motora",
-            "steps": json.dumps([
-                "3 respiraciones nasales, exhalación más larga (~6 s)",
-                "Nombra sensación y emoción en una frase breve",
-                "Formula un 'siguiente paso' concreto y realizable",
-                "Confirma disposición para iniciar"
-            ]),
-            "voice_scripts": json.dumps([
-                "Exhala un poco más largo",
-                "Di: 'tensión en hombros, ansiedad leve'",
-                "Ahora orienta tu energía a un pequeño siguiente paso"
-            ]),
-            "measurement_notes": "Activación pre/post; latencia hasta iniciar (autorreporte)",
-            "ux_notes": "Anillo que guía 3 respiraciones; campo de texto breve; botón 'Listo'",
-            "safeguards": "Permitir 'pausar' si la activación sube"
-        },
-        {
-            "name": "Péndulo Somático 90",
-            "objective": "Aumentar tolerancia alternando foco entre zona incómoda y zona neutra",
-            "context": "Sentado",
+            "name": "Pasos que Exhalan",
+            "objective": "Descargar agitación coordinando pasos y exhalación más larga",
+            "context": "De pie/En movimiento",
             "duration_seconds": 90,
             "recommended_state": ExerciseState.ROJO,
-            "taxonomy": "Pendulación interoceptiva; flexibilidad atencional",
-            "body_systems": "Propiocepción de pecho/abdomen vs. pies/manos",
+            "taxonomy": "Walking breathing; descarga motora regulada",
+            "body_systems": "Patrón de marcha; respiración; propiocepción plantar",
             "steps": json.dumps([
-                "Elige zona incómoda e intensidad inicial",
-                "Elige zona neutra/agradable",
-                "3 ciclos: 10 s zona A → 10 s zona B (con temporizador)",
-                "Re‑valora intensidad"
+                "De pie, siente las plantas de los pies",
+                "Camina inhalando durante 3 pasos",
+                "Exhala durante 4 pasos, haciendo la exhalación más larga",
+                "Repite durante varias vueltas",
+                "Nota el cambio en tu nivel de energía"
             ]),
             "voice_scripts": json.dumps([
-                "Observa la zona incómoda, sin forzar",
-                "Cambia a una zona neutra y descansa la atención",
-                "Nota qué cambió"
+                "Siente cómo las plantas de tus pies se conectan con el suelo",
+                "Deja que tu exhalación dure un paso más que la inhalación",
+                "Observa cómo la agitación va disminuyendo con cada vuelta"
             ]),
-            "measurement_notes": "Intensidad pre/post; Δ alivio",
-            "ux_notes": "Temporizador circular que cambia de color según foco A/B; hápticos en cada cambio",
-            "safeguards": "Si aumenta malestar, volver a respiración lenta o finalizar"
-        },
-        {
-            "name": "5-4-3-2-1 + Puente",
-            "objective": "Grounding multisensorial y enfoque amable hacia la siguiente acción",
-            "context": "Sentado",
-            "duration_seconds": 105,
-            "recommended_state": ExerciseState.AMBAR,
-            "taxonomy": "Exteroceptive grounding; mindful noticing",
-            "body_systems": "Visión, audición, tacto/propiocepción, olfato/gusto",
-            "steps": json.dumps([
-                "Nombra 5 cosas que ves, 4 que oyes, 3 que tocas",
-                "Identifica 2 olores/sabores presentes o recordados",
-                "Formula 1 pensamiento/acto de cuidado o siguiente paso",
-                "Respira lento y confirma"
-            ]),
-            "voice_scripts": json.dumps([
-                "Mira alrededor y nombra cinco elementos visuales",
-                "Escucha dos sonidos lejanos",
-                "Elige una idea amable para continuar"
-            ]),
-            "measurement_notes": "Valencia y activación pre/post; cumplimiento del 'puente'",
-            "ux_notes": "Checklist progresivo con círculo maestro; micro‑animaciones minimalistas",
-            "safeguards": "Modo sin estímulos fuertes (oscuro) si hay sensibilidad"
-        },
-        {
-            "name": "Semáforo Interoceptivo",
-            "objective": "Auto‑clasificar nivel de activación y aplicar micro‑protocolo",
-            "context": "Sentado",
-            "duration_seconds": 52,
-            "recommended_state": ExerciseState.CUALQUIERA,
-            "taxonomy": "Self‑rating interoceptivo; micro‑regulación adaptativa",
-            "body_systems": "Arousal percibido; respiración; tono postural",
-            "steps": json.dumps([
-                "Elige color: Verde/Ámbar/Rojo",
-                "Aplica protocolo breve (sellar, exhalar 4×, 4‑6 breathing)",
-                "Re‑valora activación",
-                "Elige continuar o pausar"
-            ]),
-            "voice_scripts": json.dumps([
-                "¿Cómo está tu activación ahora mismo?",
-                "Sigamos el protocolo para tu color",
-                "¿Prefieres continuar o pausar?"
-            ]),
-            "measurement_notes": "Arousal 0–10 pre/post; decisión; cumplimiento",
-            "ux_notes": "Botones tricolores; anillo de respiraciones; feedback inmediato",
-            "safeguards": "Aviso y recursos si hay activación extrema repetida"
-        },
-        {
-            "name": "Surf del Impulso",
-            "objective": "Observar y atravesar picos de impulso sin actuar",
-            "context": "Sentado",
-            "duration_seconds": 75,
-            "recommended_state": ExerciseState.AMBAR,
-            "taxonomy": "Urge surfing; inhibición amable; mindful awareness",
-            "body_systems": "Interocepción del impulso; respiración",
-            "steps": json.dumps([
-                "Nombra el impulso y su localización corporal",
-                "Observa 45–60 s la 'ola' con respiración constante",
-                "Re‑valora intensidad",
-                "Decide el regreso amable a tu actividad"
-            ]),
-            "voice_scripts": json.dumps([
-                "Observa el impulso como una ola que sube y baja",
-                "Respira y permanece con curiosidad",
-                "¿Bajó al menos dos puntos?"
-            ]),
-            "measurement_notes": "Intensidad pre/post; retorno (sí/no)",
-            "ux_notes": "Animación de ola con círculo de tiempo; botón 'Regresar'",
-            "safeguards": "Si el impulso implica riesgo, recomendar ayuda profesional"
-        },
-        {
-            "name": "Postura-Objetivo Snap",
-            "objective": "Ajuste postural y frase corta para alinear estado e intención",
-            "context": "Sentado",
-            "duration_seconds": 37,
-            "recommended_state": ExerciseState.VERDE,
-            "taxonomy": "Embodied goal priming; regulación postural; autoeficacia",
-            "body_systems": "Columna/mandíbula; voz suave",
-            "steps": json.dumps([
-                "Chequeo postural; liberar mandíbula",
-                "Ajusta a postura neutra/erguida",
-                "Exhala diciendo tu frase‑meta (6–8 palabras)",
-                "Nota el cambio en claridad"
-            ]),
-            "voice_scripts": json.dumps([
-                "Ajusta tus apoyos y suelta la mandíbula",
-                "Exhala y di tu frase‑meta clara y simple"
-            ]),
-            "measurement_notes": "Autoeficacia 0–10 pre/post; frase registrada",
-            "ux_notes": "Háptico breve al 'snap'; círculo 30 s; campo para frase",
-            "safeguards": "Si hay dolor, adaptar o detener"
-        },
-        {
-            "name": "Escaneo Amable 60",
-            "objective": "De malestar difuso a claridad somática con autocompasión",
-            "context": "Sentado",
-            "duration_seconds": 75,
-            "recommended_state": ExerciseState.CUALQUIERA,
-            "taxonomy": "Body scan breve; self‑compassion; etiquetado somático",
-            "body_systems": "Recorrido cabeza‑tronco‑piernas; respiración",
-            "steps": json.dumps([
-                "Recorre mentalmente 3 zonas (alta, media, baja)",
-                "Elige el punto más presente",
-                "Pon una palabra amable a la experiencia mientras exhalas",
-                "Nota cualquier cambio"
-            ]),
-            "voice_scripts": json.dumps([
-                "Explora de cabeza a pies con curiosidad",
-                "Nombra en una palabra lo que sientes y sé amable contigo"
-            ]),
-            "measurement_notes": "Intensidad 0–10 pre/post; utilidad percibida",
-            "ux_notes": "Círculo de progreso con tres segmentos; voz cálida",
-            "safeguards": "Permitir saltar zonas si hay incomodidad"
+            "measurement_notes": "Estado (letargo/ok/agitado); cambio en activación; disposición a continuar",
+            "ux_notes": "Metrónomo sutil por pasos (opcional); círculo visual de 90 segundos; contador de pasos",
+            "safeguards": "Usar en espacios seguros; pasillo despejado; detenerse si hay mareo"
         },
         {
             "name": "Anclaje Corazón-Respira",
             "objective": "Activar calma mediante contacto propioceptivo y exhalación prolongada",
             "context": "Sentado",
             "duration_seconds": 60,
-            "recommended_state": ExerciseState.ROJO,
-            "taxonomy": "Vagal toning; respiración 4‑6; seguridad somática",
+            "recommended_state": ExerciseState.AMBAR,
+            "taxonomy": "Vagal toning; respiración 4-6; seguridad somática",
             "body_systems": "Mano en pecho/abdomen; ritmo respiratorio",
             "steps": json.dumps([
                 "Coloca una mano en el pecho y otra en el abdomen",
-                "Inhala 4 s, exhala 6 s × 6 ciclos",
+                "Inhala 4 segundos, exhala 6 segundos",
+                "Repite durante 6 ciclos completos",
                 "Percibe el vaivén bajo tus manos"
             ]),
             "voice_scripts": json.dumps([
-                "Siente el contacto y deja que la exhalación se alargue sola"
+                "Siente el contacto cálido de tus manos",
+                "Inhala lentamente por 4... exhala suavemente por 6",
+                "Deja que la exhalación se alargue sin esfuerzo"
             ]),
             "measurement_notes": "Ritmo percibido (rápido/medio/lento); activación pre/post",
-            "ux_notes": "Anillo que marca ciclos; háptico al cambio inhalar/exhalar",
+            "ux_notes": "Anillo que marca ciclos; háptico al cambio inhalar/exhalar; animación de corazón",
             "safeguards": "Si hay mareo, reducir ritmo o detener"
         },
         {
-            "name": "Horizonte Periférico 3D",
-            "objective": "Reducir hipervigilancia ampliando campo visual y señales de seguridad",
+            "name": "Escaneo Amable 60",
+            "objective": "De malestar difuso a claridad somática con autocompasión",
             "context": "Sentado",
             "duration_seconds": 75,
-            "recommended_state": ExerciseState.AMBAR,
-            "taxonomy": "Visual field widening; orientación contextual; grounding auditivo/táctil",
-            "body_systems": "Músculos oculomotores; audición; propiocepción de apoyo",
+            "recommended_state": ExerciseState.VERDE,
+            "taxonomy": "Body scan breve; self-compassion; etiquetado somático",
+            "body_systems": "Recorrido cabeza-tronco-piernas; respiración",
             "steps": json.dumps([
-                "Explora con la mirada izquierda‑centro‑derecha‑arriba‑abajo",
-                "Suaviza enfoque para sentir visión periférica 10 s",
-                "Identifica 2 sonidos y 1 sensación de apoyo"
+                "Recorre mentalmente 3 zonas: cabeza y cuello, tronco, piernas",
+                "Elige el punto donde sientes algo más presente",
+                "Pon una palabra amable a la experiencia mientras exhalas",
+                "Nota cualquier cambio en tu cuerpo"
             ]),
             "voice_scripts": json.dumps([
-                "Abre tu visión como si miraras el horizonte",
-                "Reconoce un sonido lejano y el apoyo de tus pies"
+                "Explora de cabeza a pies con curiosidad amable",
+                "¿Dónde sientes algo en este momento?",
+                "Nombra en una palabra lo que sientes y sé amable contigo",
+                "Nota qué cambió al reconocer tu experiencia"
             ]),
-            "measurement_notes": "Activación 0–10 pre/post; seguridad percibida (baja/media/alta)",
-            "ux_notes": "Animación suave de expansión; círculo maestro; opción sin audio",
-            "safeguards": "Si hay mareo, permitir cerrar ojos o detener"
+            "measurement_notes": "Intensidad 0-10 pre/post; utilidad percibida",
+            "ux_notes": "Círculo de progreso con tres segmentos corporales; voz cálida; ilustración de silueta",
+            "safeguards": "Permitir saltar zonas si hay incomodidad"
         },
-        {
-            "name": "Pasos que Exhalan",
-            "objective": "Descargar agitación coordinando pasos y exhalación más larga",
-            "context": "De pie/en movimiento",
-            "duration_seconds": 90,
-            "recommended_state": ExerciseState.AMBAR,
-            "taxonomy": "Walking breathing; descarga motora regulada",
-            "body_systems": "Patrón de marcha; respiración; propiocepción plantar",
-            "steps": json.dumps([
-                "De pie: siente las plantas de los pies",
-                "Camina: inhala 3 pasos, exhala 4 durante varias vueltas",
-                "Nota el cambio en energía"
-            ]),
-            "voice_scripts": json.dumps([
-                "Deja que tu exhalación dure un paso más que la inhalación"
-            ]),
-            "measurement_notes": "Estado (letargo/ok/agitado); Δ activación; disposición a continuar",
-            "ux_notes": "Metrónomo sutil por pasos (opcional); círculo 90 s",
-            "safeguards": "Usar en espacios seguros; pasillo despejado"
-        },
-        {
-            "name": "Resonancia Mmm 60",
-            "objective": "Calmar mediante vibración suave y exhalación prolongada",
-            "context": "Sentado",
-            "duration_seconds": 52,
-            "recommended_state": ExerciseState.ROJO,
-            "taxonomy": "Humming breath; regulación vagal; atención a vibración",
-            "body_systems": "Laringe, cavidad oral, caja torácica",
-            "steps": json.dumps([
-                "Inhala nasal 3–4 s",
-                "Exhala con 'mmm' 5–6 s, notando vibración",
-                "Repite 5 ciclos y re‑evalúa"
-            ]),
-            "voice_scripts": json.dumps([
-                "Siente la vibración en labios y pecho mientras exhalas"
-            ]),
-            "measurement_notes": "Localización de vibración (labios/pecho/cara); activación pre/post",
-            "ux_notes": "Temporizador por ciclos dentro de un anillo; opción de silencio si en público",
-            "safeguards": "Evitar si hay dolor de garganta agudo"
-        }
     ]
     
     for exercise_data in exercises_data:
@@ -525,5 +333,6 @@ def seed_wellness_exercises(db: Session):
     
     db.commit()
     logger.info(f"Sembraron {len(exercises_data)} ejercicios de bienestar exitosamente.")
+
 
 
