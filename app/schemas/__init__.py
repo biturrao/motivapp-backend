@@ -16,4 +16,11 @@ from .chat import (
     ChatMessage, ChatMessageCreate, ChatRequest, ChatResponse, 
     ChatHistoryResponse, ProfileSummaryRequest, ProfileSummaryResponse
 )
+from .wellness import (
+    WellnessExercise, WellnessExerciseCreate,
+    MetamotivationEnergy, MetamotivationEnergyCreate,
+    ExerciseCompletion, ExerciseCompletionCreate, ExerciseCompletionUpdate,
+    ExerciseCompletionWithExercise,
+    ExerciseRecommendationRequest, ExerciseRecommendationResponse
+)
 
