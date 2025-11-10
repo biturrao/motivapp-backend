@@ -186,6 +186,38 @@ def get_exercise(
     return exercise
 
 
+@router.post("/exercises/complete", response_model=ExerciseCompletion, status_code=status.HTTP_201_CREATED)
+def complete_exercise_direct(
+    completion_data: ExerciseCompletionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Completar un ejercicio directamente (sin dos pasos).
+    Crea un registro de completación con mediciones pre y post.
+    """
+    # Verificar que el ejercicio existe
+    exercise = crud_wellness.get_exercise(db, completion_data.exercise_id)
+    if not exercise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ejercicio no encontrado"
+        )
+    
+    # Crear la completación
+    completion = crud_completion.create_completion(db, current_user.id, completion_data)
+    
+    # Si tiene intensidad post, marcar como completado
+    if completion_data.intensity_post is not None:
+        update_data = ExerciseCompletionUpdate(
+            intensity_post=completion_data.intensity_post,
+            completed_at=True
+        )
+        completion = crud_completion.update_completion(db, completion.id, update_data)
+    
+    return completion
+
+
 @router.post("/completions", response_model=ExerciseCompletion, status_code=status.HTTP_201_CREATED)
 def start_exercise(
     completion_data: ExerciseCompletionCreate,
@@ -253,6 +285,23 @@ def get_todays_completions(
 ):
     """Obtener las completaciones de hoy"""
     return crud_completion.get_todays_completions(db, current_user.id)
+
+
+@router.get("/stats")
+def get_wellness_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener estadísticas de bienestar: racha y total de ejercicios completados"""
+    streak = crud_completion.get_completion_streak(db, current_user.id)
+    total_completions = crud_completion.get_total_completions(db, current_user.id)
+    last_completion = crud_completion.get_last_completion_date(db, current_user.id)
+    
+    return {
+        "streak": streak,
+        "total_completions": total_completions,
+        "last_completion": last_completion
+    }
 
 
 @router.get("/stats/exercises")

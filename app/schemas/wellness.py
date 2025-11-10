@@ -68,7 +68,8 @@ class ExerciseCompletionUpdate(BaseModel):
     """Schema para actualizar una completación en progreso"""
     intensity_post: Optional[int] = Field(None, ge=0, le=10)
     user_notes: Optional[str] = None
-    completed: bool = True
+    completed: Optional[bool] = None
+    completed_at: Optional[bool] = None  # Si es True, se actualizará con datetime.utcnow()
 
 
 class ExerciseCompletion(ExerciseCompletionBase):

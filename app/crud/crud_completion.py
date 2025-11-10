@@ -160,3 +160,34 @@ def get_exercise_completion_history(
             ExerciseCompletion.exercise_id == exercise_id
         )
     ).order_by(ExerciseCompletion.started_at.desc()).all()
+
+
+def get_total_completions(
+    db: Session,
+    user_id: int
+) -> int:
+    """Obtener el total de ejercicios completados por el usuario"""
+    return db.query(ExerciseCompletion).filter(
+        and_(
+            ExerciseCompletion.user_id == user_id,
+            ExerciseCompletion.completed == True
+        )
+    ).count()
+
+
+def get_last_completion_date(
+    db: Session,
+    user_id: int
+) -> Optional[str]:
+    """Obtener la fecha de la última completación"""
+    completion = db.query(ExerciseCompletion).filter(
+        and_(
+            ExerciseCompletion.user_id == user_id,
+            ExerciseCompletion.completed == True
+        )
+    ).order_by(ExerciseCompletion.completed_at.desc()).first()
+    
+    if completion and completion.completed_at:
+        return completion.completed_at.isoformat()
+    return None
+
