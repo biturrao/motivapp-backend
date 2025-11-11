@@ -26,6 +26,9 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 # Nombre de la IA
 AI_NAME = 'Flou'
 
+# Modelo por defecto (exportado para compatibilidad con wellness.py)
+model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
+
 
 # ---------------------------- PROMPT DE SISTEMA ---------------------------- #
 
@@ -173,7 +176,7 @@ async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     Extrae slots estructurados del texto libre usando Gemini 2.5 Pro
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        llm_model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
         
         sys_prompt = """Extrae como JSON compacto los campos del texto del usuario:
 - sentimiento: aburrimiento|frustracion|ansiedad_error|dispersion_rumiacion|baja_autoeficacia|otro
@@ -192,7 +195,7 @@ Slots actuales: {current_slots.model_dump_json()}
 
 JSON extraído:"""
 
-        response = model.generate_content(
+        response = llm_model.generate_content(
             f"{sys_prompt}\n\n{user_prompt}",
             generation_config=genai.types.GenerationConfig(
                 temperature=0.2,
@@ -454,14 +457,14 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
     logger.warning("Usando generate_chat_response legacy - considera migrar a handle_user_turn")
     
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        llm_model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
         
         full_prompt = get_system_prompt() + "\n\n"
         if context:
             full_prompt += f"{context}\n\n"
         full_prompt += f"El usuario pregunta: \"{user_message}\""
         
-        response = model.generate_content(
+        response = llm_model.generate_content(
             full_prompt,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
@@ -479,7 +482,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
 async def generate_profile_summary(profile: dict) -> str:
     """Genera un resumen del perfil del usuario usando Gemini"""
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        llm_model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
         
         summary_prompt = f"""
 ### Rol
@@ -498,7 +501,7 @@ Basado en los siguientes datos del perfil en formato JSON, crea un resumen que d
 ### Tu Resumen:
 """
         
-        response = model.generate_content(
+        response = llm_model.generate_content(
             summary_prompt,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
