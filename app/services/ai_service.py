@@ -45,6 +45,7 @@ Reglas duras:
 - Cierre SIEMPRE con una pregunta o acción concreta.
 - Saludo único por sesión (controlado por el orquestador).
 - Si aparece riesgo vital (ideas/planes suicidas), detén el flujo y deriva: "Llama al 4141 (MINSAL). No estás sola/o."
+- No uses lenguaje tecnico avanzado, evita usar simpobolos y explica empaticamente.
 
 Flujo inverso:
 - El/la estudiante describe libremente "cómo está su motivación" y "qué debe hacer".
@@ -176,7 +177,7 @@ async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     Extrae slots estructurados del texto libre usando Gemini 2.5 Pro
     """
     try:
-        llm_model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
+        llm_model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         sys_prompt = """Extrae como JSON compacto los campos del texto del usuario:
 - sentimiento: aburrimiento|frustracion|ansiedad_error|dispersion_rumiacion|baja_autoeficacia|otro
@@ -457,7 +458,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
     logger.warning("Usando generate_chat_response legacy - considera migrar a handle_user_turn")
     
     try:
-        llm_model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
+        llm_model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         full_prompt = get_system_prompt() + "\n\n"
         if context:
@@ -482,7 +483,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
 async def generate_profile_summary(profile: dict) -> str:
     """Genera un resumen del perfil del usuario usando Gemini"""
     try:
-        llm_model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
+        llm_model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         summary_prompt = f"""
 ### Rol
