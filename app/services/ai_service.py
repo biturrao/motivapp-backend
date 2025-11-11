@@ -16,7 +16,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 model = GenerativeModel('gemini-2.0-flash')
 
 # Nombre de la IA
-AI_NAME = 'Newra'
+AI_NAME = 'Flou'
 
 
 def get_base_prompt() -> str:

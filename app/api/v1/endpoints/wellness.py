@@ -186,6 +186,25 @@ def get_exercise(
     return exercise
 
 
+@router.delete("/exercises/{exercise_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_exercise(
+    exercise_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Eliminar un ejercicio específico por ID.
+    Esto también eliminará todas las completaciones asociadas debido al cascade.
+    """
+    deleted = crud_wellness.delete_exercise(db, exercise_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ejercicio no encontrado"
+        )
+    return None
+
+
 @router.post("/exercises/complete", response_model=ExerciseCompletion, status_code=status.HTTP_201_CREATED)
 def complete_exercise_direct(
     completion_data: ExerciseCompletionCreate,

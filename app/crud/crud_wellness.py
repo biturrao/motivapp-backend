@@ -106,6 +106,20 @@ def create_exercise(db: Session, exercise: WellnessExerciseCreate) -> WellnessEx
     return db_exercise
 
 
+def delete_exercise(db: Session, exercise_id: int) -> bool:
+    """
+    Eliminar un ejercicio por ID.
+    Retorna True si se eliminó, False si no existía.
+    """
+    exercise = db.query(WellnessExercise).filter(WellnessExercise.id == exercise_id).first()
+    if not exercise:
+        return False
+    
+    db.delete(exercise)
+    db.commit()
+    return True
+
+
 def get_user_exercise_stats(db: Session, user_id: int, days: int = 30) -> dict:
     """
     Obtener estadísticas de ejercicios del usuario en los últimos N días
