@@ -118,7 +118,7 @@ Cómo estructurar tu respuesta (sin mostrar estos elementos técnicos):
 - Cierra con una pregunta amigable para mantener la conversación.
 
 RECUERDA: NO muestres clasificaciones técnicas (A, B, ↑, ↓, promoción, prevención, etc.) al usuario.
-"""
+
 
 
 Plantilla de salida obligatoria (no la muestres como plantilla, úsala):
