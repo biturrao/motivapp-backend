@@ -33,4 +33,7 @@ class User(Base):
     
     # Chat messages relationship
     chat_messages = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
+    
+    # Session state relationship (metamotivational tutor)
+    session_state = relationship("SessionState", back_populates="user", uselist=False, cascade="all, delete-orphan")
 

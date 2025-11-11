@@ -13,7 +13,8 @@ from app.schemas.chat import (
     ProfileSummaryRequest, ProfileSummaryResponse, ChatMessage as ChatMessageSchema
 )
 from app.crud import crud_chat
-from app.services.ai_service import generate_chat_response, generate_profile_summary
+from app.crud import crud_session
+from app.services.ai_service import handle_user_turn, generate_profile_summary
 from app.crud.crud_user_profile import get_profile
 from app.crud.crud_daily_check_in import get_latest_checkin
 from app.crud.crud_dashboard import get_questionnaire_summary
@@ -28,50 +29,48 @@ def build_user_context(db: Session, user: User) -> str:
     Construye el contexto del usuario para personalizar las respuestas de la IA.
     """
     try:
-        context_string = "Contexto del usuario para esta conversación (no lo menciones directamente, úsalo para personalizar tu respuesta): "
+        context_string = "Contexto del usuario (no lo menciones directamente, úsalo para personalizar): "
         
         # Obtener último check-in
         last_checkin = get_latest_checkin(db, user.id)
         if last_checkin:
-            context_string += f"Su último check-in de motivación fue de {last_checkin.motivation_level} sobre 6. "
+            context_string += f"Último check-in de motivación: {last_checkin.motivation_level}/6. "
         
         # Obtener resumen del cuestionario
         summary = get_questionnaire_summary(db, user_id=user.id)
         if summary:
-            context_string += "Su resumen del cuestionario de meta-motivación es: "
-            summary_parts = [f"{s['section_name']} con un promedio de {s['average_score']:.1f} sobre 7" for s in summary]
+            context_string += "Resumen cuestionario meta-motivación: "
+            summary_parts = [f"{s['section_name']} promedio {s['average_score']:.1f}/7" for s in summary]
             context_string += ", ".join(summary_parts) + ". "
         
         # Obtener perfil
         profile = get_profile(db, user.id)
         if profile:
-            context_string += "Información adicional de su perfil: "
+            context_string += "Perfil: "
             profile_parts = []
             
             if profile.name:
-                profile_parts.append(f"nombre: {profile.name}")
+                profile_parts.append(f"nombre {profile.name}")
             if profile.age:
-                profile_parts.append(f"edad: {profile.age}")
+                profile_parts.append(f"edad {profile.age}")
             if profile.institution:
-                profile_parts.append(f"institución: {profile.institution}")
+                profile_parts.append(f"institución {profile.institution}")
             if profile.major:
-                profile_parts.append(f"carrera: {profile.major}")
+                profile_parts.append(f"carrera {profile.major}")
             if profile.entry_year:
-                profile_parts.append(f"año de ingreso: {profile.entry_year}")
+                profile_parts.append(f"año ingreso {profile.entry_year}")
             if profile.course_types:
-                profile_parts.append(f"tipo de asignaturas: \"{profile.course_types}\"")
+                profile_parts.append(f"tipo asignaturas: {profile.course_types}")
             if profile.family_responsibilities:
-                profile_parts.append(f"responsabilidades familiares: \"{profile.family_responsibilities}\"")
+                profile_parts.append(f"responsabilidades familiares: {profile.family_responsibilities}")
             if profile.is_working:
-                profile_parts.append(f"situación laboral: \"{profile.is_working}\"")
+                profile_parts.append(f"situación laboral: {profile.is_working}")
             if profile.mental_health_support:
-                profile_parts.append(f"seguimiento de salud mental: \"{profile.mental_health_support}\"")
+                profile_parts.append(f"apoyo salud mental: {profile.mental_health_support}")
             if profile.chronic_condition:
-                profile_parts.append(f"condición médica crónica: \"{profile.chronic_condition}\"")
+                profile_parts.append(f"condición crónica: {profile.chronic_condition}")
             if profile.neurodivergence:
-                profile_parts.append(f"neurodivergencia: \"{profile.neurodivergence}\"")
-            if profile.preferred_support_types:
-                profile_parts.append(f"tipos de apoyo preferidos: \"{profile.preferred_support_types}\"")
+                profile_parts.append(f"neurodivergencia: {profile.neurodivergence}")
             
             if profile_parts:
                 context_string += ", ".join(profile_parts) + ". "
@@ -91,6 +90,7 @@ async def send_message(
 ):
     """
     Envía un mensaje al chatbot y obtiene una respuesta.
+    Usa el sistema metamotivacional de Flou (Miele & Scholer).
     Guarda ambos mensajes en el historial del usuario.
     """
     try:
@@ -102,14 +102,22 @@ async def send_message(
             text=request.message
         )
         
+        # Obtener o crear sesión metamotivacional
+        session_db = crud_session.get_or_create_session(db, current_user.id)
+        session_schema = crud_session.session_to_schema(session_db)
+        
         # Construir contexto del usuario
         context = build_user_context(db, current_user)
         
-        # Generar respuesta de la IA
-        ai_response_text = await generate_chat_response(
-            user_message=request.message,
+        # Procesar con el orquestador metamotivacional
+        ai_response_text, updated_session = await handle_user_turn(
+            session=session_schema,
+            user_text=request.message,
             context=context
         )
+        
+        # Guardar sesión actualizada
+        crud_session.update_session(db, current_user.id, updated_session)
         
         # Crear el mensaje de la IA
         ai_message = crud_chat.create_message(
@@ -121,11 +129,12 @@ async def send_message(
         
         return ChatResponse(
             user_message=ChatMessageSchema.from_orm(user_message),
-            ai_message=ChatMessageSchema.from_orm(ai_message)
+            ai_message=ChatMessageSchema.from_orm(ai_message),
+            session_state=updated_session  # Opcional para debugging
         )
         
     except Exception as e:
-        logger.error(f"Error procesando mensaje de chat: {e}")
+        logger.error(f"Error procesando mensaje de chat: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error al procesar el mensaje")
 
 
@@ -154,10 +163,19 @@ def clear_chat_history(
 ):
     """
     Elimina todo el historial de chat del usuario actual.
+    También reinicia la sesión metamotivacional.
     """
     try:
+        # Eliminar mensajes
         count = crud_chat.delete_user_messages(db, current_user.id)
-        return {"message": f"Se eliminaron {count} mensajes del historial", "count": count}
+        
+        # Reiniciar sesión
+        crud_session.reset_session(db, current_user.id)
+        
+        return {
+            "message": f"Se eliminaron {count} mensajes del historial y se reinició la sesión",
+            "count": count
+        }
     except Exception as e:
         logger.error(f"Error eliminando historial de chat: {e}")
         raise HTTPException(status_code=500, detail="Error al eliminar el historial")
@@ -207,3 +225,4 @@ async def get_profile_summary(
     except Exception as e:
         logger.error(f"Error generando resumen de perfil: {e}")
         raise HTTPException(status_code=500, detail="Error al generar el resumen del perfil")
+
