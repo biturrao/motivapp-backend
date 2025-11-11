@@ -27,7 +27,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 AI_NAME = 'Flou'
 
 # Modelo por defecto (exportado para compatibilidad con wellness.py)
-model = genai.GenerativeModel('gemini-1.5-pro-latest')
+model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 
 # ---------------------------- PROMPT DE SISTEMA ---------------------------- #
@@ -177,7 +177,7 @@ async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     Extrae slots estructurados del texto libre usando Gemini 2.5 Pro
     """
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         sys_prompt = """Extrae como JSON compacto los campos del texto del usuario:
 - sentimiento: aburrimiento|frustracion|ansiedad_error|dispersion_rumiacion|baja_autoeficacia|otro
@@ -458,7 +458,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
     logger.warning("Usando generate_chat_response legacy - considera migrar a handle_user_turn")
     
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         full_prompt = get_system_prompt() + "\n\n"
         if context:
@@ -483,7 +483,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
 async def generate_profile_summary(profile: dict) -> str:
     """Genera un resumen del perfil del usuario usando Gemini"""
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         summary_prompt = f"""
 ### Rol
