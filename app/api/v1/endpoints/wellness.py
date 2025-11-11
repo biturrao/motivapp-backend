@@ -1,6 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
@@ -226,13 +227,17 @@ def complete_exercise_direct(
     # Crear la completación
     completion = crud_completion.create_completion(db, current_user.id, completion_data)
     
-    # Si tiene intensidad post, marcar como completado
+    # Si tiene intensidad post, marcar como completado con timestamp
     if completion_data.intensity_post is not None:
         update_data = ExerciseCompletionUpdate(
             intensity_post=completion_data.intensity_post,
-            completed_at=True
+            completed=True
         )
         completion = crud_completion.update_completion(db, completion.id, update_data)
+        # Actualizar el completed_at manualmente
+        completion.completed_at = datetime.utcnow()
+        db.commit()
+        db.refresh(completion)
     
     return completion
 
