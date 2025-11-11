@@ -516,12 +516,33 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
-    # 6) Derivación emocional si ≥3 iteraciones sin progreso
-    if session.iteration >= 3:
+    # 6) Derivación a bienestar si ≥2 iteraciones sin progreso
+    if session.iteration >= 2:
         if session.last_eval_result and session.last_eval_result.cambio_sentimiento != "↓":
-            reply = emotional_fallback(new_slots.sentimiento)
-            session.iteration = 0  # Reset
-            return reply, session, None
+            # Ofrecer derivación a ejercicios de bienestar
+            reply = f"""Veo que hemos intentado un par de estrategias y no ha habido mucha mejora 😔
+
+A veces, lo que sentimos no es solo un tema de cómo organizarnos, sino que el cuerpo y la mente necesitan un respiro primero.
+
+¿Qué te parece si primero hacemos un ejercicio breve de bienestar? Hay algunos de respiración, relajación o mindfulness que pueden ayudarte a resetear antes de volver a la tarea.
+
+¿Quieres probar uno? Solo toma 3-5 minutos."""
+            
+            quick_replies = [
+                {"label": "✅ Sí, quiero probar", "value": "DERIVAR_BIENESTAR"},
+                {"label": "🔄 No, sigamos intentando", "value": "continuar estrategias"}
+            ]
+            
+            return reply, session, quick_replies
+    
+    # Si el usuario aceptó ir a bienestar
+    if "DERIVAR_BIENESTAR" in user_text.upper():
+        session.iteration = 0  # Reset para cuando vuelva
+        reply = "Perfecto 😊 Te voy a llevar a la sección de Bienestar donde encontrarás ejercicios que pueden ayudarte. Cuando termines, vuelve y seguimos con tu tarea."
+        quick_replies = [
+            {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
+        ]
+        return reply, session, quick_replies
     
     # 7) Generar respuesta conversacional usando Gemini con historial
     try:
