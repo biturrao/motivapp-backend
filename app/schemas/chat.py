@@ -54,6 +54,7 @@ class EvalResult(BaseModel):
     """Resultado de la evaluación de un bloque"""
     exito: Optional[bool] = None
     cambio_sentimiento: Optional[Literal["↑", "=", "↓"]] = None
+    fallos_consecutivos: Optional[int] = 0  # Contador para derivación a bienestar
 
 
 class SessionStateSchema(BaseModel):

@@ -75,6 +75,10 @@ REGLAS IMPORTANTES:
 - Si detectas riesgo de suicidio, di: "Por favor llama al 4141 (línea MINSAL gratuita). Están para ayudarte 24/7"
 - Mantén la conversación fluida, recuerda lo que el estudiante te contó antes
 - Adapta tus consejos a lo que ya han intentado juntos
+- NUNCA muestres al usuario cosas técnicas como "Ajuste inferido: A·↑" o símbolos como ↑↓·→
+- NO uses plantillas visibles, habla naturalmente
+
+IMPORTANTE: Toda la clasificación (Q2, Q3, enfoque) es INTERNA, NUNCA la menciones al usuario.
 
 Clasificación silenciosa:
 
@@ -105,7 +109,7 @@ Dispersión/Rumiación→acotar alcance y tiempo, siempre ↓.
 
 Plantilla de salida obligatoria (no la muestres como plantilla, úsala):
 
-- **Ajuste inferido:** A|B · ↑|↓|mixto · promoción/eager|prevención/vigilant
+- **Ajuste inferido:** (A|B) · (↑|↓|mixto) · (promoción/eager|prevención/vigilant)
 
 - **Estrategia (3 viñetas máx.)** con UNA sub-tarea verificable (p.ej., "solo bosquejo 5 bullets" / "solo Introducción" / "solo 10 ítems MCQ").
 
@@ -121,8 +125,6 @@ Bucle iterativo (el orquestador lleva el contador):
 - Si hay progreso (éxito o ↓ del malestar), consolida y avanza al siguiente micro-paso.
 
 - Sin progreso, recalibra en este orden: Q3 (↑↔↓) → tamaño de tarea/tiempo → enfoque (promoción↔prevención) si procede.
-
-- Tras 3 iteraciones sin mejora, sugiere ejercicio breve de regulación emocional (según señal) y vuelve con bloque 10–12 min y sub-tarea mínima.
 RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 """
 
@@ -516,29 +518,50 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
-    # 6) Derivación a bienestar si ≥2 iteraciones sin progreso
-    if session.iteration >= 2:
-        if session.last_eval_result and session.last_eval_result.cambio_sentimiento != "↓":
-            # Ofrecer derivación a ejercicios de bienestar
-            reply = f"""Veo que hemos intentado un par de estrategias y no ha habido mucha mejora 😔
+    # Detectar si el usuario indica que no mejoró o está peor
+    respuestas_sin_mejora = ["no funcionó", "sigo igual", "peor", "no mejoró", "igual", "no ayudó", "no sirvió", "me siento peor"]
+    user_text_lower = user_text.lower()
+    sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
+    
+    # Si el usuario indica que no hubo mejora, incrementar contador
+    if sin_mejora and session.iteration > 0:
+        # Incrementar contador de fallos
+        fallos = session.last_eval_result.fallos_consecutivos if session.last_eval_result else 0
+        fallos += 1
+        session.last_eval_result = EvalResult(fallos_consecutivos=fallos, cambio_sentimiento="=")
+    elif session.iteration > 0:
+        # Si responde algo positivo, resetear contador
+        respuestas_mejora = ["me ayudó", "funcionó", "mejor", "siento mejor", "bien", "genial"]
+        mejora = any(frase in user_text_lower for frase in respuestas_mejora)
+        if mejora:
+            session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
+    
+    # 6) Derivación a bienestar si ≥2 estrategias sin mejora
+    if session.last_eval_result and session.last_eval_result.fallos_consecutivos >= 2:
+        # Ofrecer derivación a ejercicios de bienestar
+        reply = f"""Veo que hemos intentado un par de estrategias y todavía no te sientes mejor 😔
 
-A veces, lo que sentimos no es solo un tema de cómo organizarnos, sino que el cuerpo y la mente necesitan un respiro primero.
+A veces lo que sentimos no es solo un tema de organización o método de estudio. El cuerpo y la mente necesitan un respiro antes de seguir intentando.
 
-¿Qué te parece si primero hacemos un ejercicio breve de bienestar? Hay algunos de respiración, relajación o mindfulness que pueden ayudarte a resetear antes de volver a la tarea.
+¿Qué te parece si primero hacemos un ejercicio breve de bienestar? Hay algunos de respiración, relajación o mindfulness que pueden ayudarte a resetear.
 
-¿Quieres probar uno? Solo toma 3-5 minutos."""
-            
-            quick_replies = [
-                {"label": "✅ Sí, quiero probar", "value": "DERIVAR_BIENESTAR"},
-                {"label": "🔄 No, sigamos intentando", "value": "continuar estrategias"}
-            ]
-            
-            return reply, session, quick_replies
+Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
+        
+        quick_replies = [
+            {"label": "✅ Sí, vamos a intentarlo", "value": "DERIVAR_BIENESTAR"},
+            {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+        ]
+        
+        # Reset del contador para que no siga ofreciendo
+        session.last_eval_result = EvalResult(fallos_consecutivos=0)
+        
+        return reply, session, quick_replies
     
     # Si el usuario aceptó ir a bienestar
     if "DERIVAR_BIENESTAR" in user_text.upper():
         session.iteration = 0  # Reset para cuando vuelva
-        reply = "Perfecto 😊 Te voy a llevar a la sección de Bienestar donde encontrarás ejercicios que pueden ayudarte. Cuando termines, vuelve y seguimos con tu tarea."
+        session.last_eval_result = EvalResult(fallos_consecutivos=0)
+        reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
         quick_replies = [
             {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
         ]
@@ -595,8 +618,16 @@ A veces, lo que sentimos no es solo un tema de cómo organizarnos, sino que el c
     session.iteration += 1
     session.last_strategy = reply
     
-    # No ofrecer quick replies en respuestas conversacionales - dejar fluir la conversación
-    quick_replies = None
+    # Si ya dio una estrategia (iteration > 1), preguntar si funcionó
+    if session.iteration > 1:
+        quick_replies = [
+            {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+            {"label": "😐 Sigo igual", "value": "sigo igual"},
+            {"label": "😟 Me siento peor", "value": "no funcionó"}
+        ]
+    else:
+        # En la primera interacción, dejar fluir la conversación
+        quick_replies = None
     
     return reply, session, quick_replies
 
