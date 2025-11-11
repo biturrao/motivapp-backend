@@ -27,7 +27,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 AI_NAME = 'Flou'
 
 # Modelo por defecto (exportado para compatibilidad con wellness.py)
-model = genai.GenerativeModel('gemini-2.5-flash-preview-0925')
+model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
 
 # ---------------------------- PROMPT DE SISTEMA ---------------------------- #
