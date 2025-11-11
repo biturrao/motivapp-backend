@@ -83,19 +83,20 @@ class ChatMessageCreate(ChatMessageBase):
     pass
 
 
-class ChatMessage(ChatMessageBase):
-    id: int
-    user_id: int
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
 class QuickReply(BaseModel):
     """Opción de respuesta rápida para el usuario"""
     label: str  # Texto que se muestra en el botón
     value: str  # Valor que se envía al backend
+
+
+class ChatMessage(ChatMessageBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    quick_replies: Optional[List[QuickReply]] = None  # Para incluir en respuestas
+    
+    class Config:
+        from_attributes = True
 
 
 class ChatRequest(BaseModel):

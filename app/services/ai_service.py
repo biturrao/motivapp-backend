@@ -618,15 +618,16 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
     session.iteration += 1
     session.last_strategy = reply
     
-    # Si ya dio una estrategia (iteration > 1), preguntar si funcionó
-    if session.iteration > 1:
+    # Si ya dio una estrategia (iteration >= 1), preguntar si funcionó
+    # La primera iteración es el saludo, desde la segunda ya da estrategias
+    if session.iteration >= 1:
         quick_replies = [
             {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
             {"label": "😐 Sigo igual", "value": "sigo igual"},
             {"label": "😟 Me siento peor", "value": "no funcionó"}
         ]
     else:
-        # En la primera interacción, dejar fluir la conversación
+        # Solo en el primer mensaje (saludo), dejar fluir la conversación
         quick_replies = None
     
     return reply, session, quick_replies

@@ -154,12 +154,71 @@ def get_chat_history(
 ):
     """
     Obtiene el historial de chat del usuario actual.
+    Incluye quick_replies en el último mensaje si corresponde.
     """
     try:
         messages = crud_chat.get_user_messages(db, current_user.id)
-        return ChatHistoryResponse(
-            messages=[ChatMessageSchema.from_orm(msg) for msg in messages]
-        )
+        
+        # Si no hay mensajes, retornar vacío
+        if not messages:
+            return ChatHistoryResponse(messages=[])
+        
+        # Convertir mensajes a schema
+        message_list = [ChatMessageSchema.from_orm(msg) for msg in messages]
+        
+        # Si el último mensaje es del modelo y no es un saludo inicial,
+        # regenerar quick_replies basándose en el estado de la sesión
+        if message_list and message_list[-1].role == 'model':
+            session_db = crud_session.get_or_create_session(db, current_user.id)
+            session_schema = crud_session.session_to_schema(session_db)
+            
+            # Regenerar quick replies basándose en el estado
+            quick_replies = None
+            
+            # Si ya hubo interacción (iteration >= 1), mostrar opciones de evaluación
+            if session_schema.iteration >= 1:
+                # Verificar si no estamos en un flujo especial (derivación a bienestar)
+                last_message_text = message_list[-1].text.lower()
+                
+                # Si el mensaje menciona bienestar, es probable que sea oferta de derivación
+                if "bienestar" in last_message_text and "ejercicio" in last_message_text:
+                    # Ya tiene sus propios quick replies de derivación
+                    if "quieres probar" in last_message_text or "¿quieres" in last_message_text:
+                        quick_replies = [
+                            {"label": "✅ Sí, vamos a intentarlo", "value": "DERIVAR_BIENESTAR"},
+                            {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+                        ]
+                    elif "ir a bienestar" in last_message_text or "sección de bienestar" in last_message_text:
+                        quick_replies = [
+                            {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
+                        ]
+                elif "cómo está tu motivación" in last_message_text:
+                    # Es el saludo inicial
+                    quick_replies = [
+                        {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
+                        {"label": "😤 Frustración", "value": "Siento frustración"},
+                        {"label": "😰 Ansiedad", "value": "Siento ansiedad"},
+                        {"label": "🌀 Dispersión", "value": "Siento dispersión"},
+                        {"label": "😔 Baja motivación", "value": "Tengo baja motivación"},
+                        {"label": "💭 Otro", "value": "Siento otra cosa"}
+                    ]
+                else:
+                    # Es una estrategia normal, mostrar opciones de evaluación
+                    quick_replies = [
+                        {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+                        {"label": "😐 Sigo igual", "value": "sigo igual"},
+                        {"label": "😟 Me siento peor", "value": "no funcionó"}
+                    ]
+                
+                # Agregar quick_replies al último mensaje si existen
+                if quick_replies:
+                    # Crear una versión modificada del último mensaje con quick_replies
+                    # Nota: Pydantic no permite modificar directamente, así que creamos uno nuevo
+                    last_msg_dict = message_list[-1].dict()
+                    last_msg_dict['quick_replies'] = quick_replies
+                    message_list[-1] = ChatMessageSchema(**last_msg_dict)
+        
+        return ChatHistoryResponse(messages=message_list)
     except Exception as e:
         logger.error(f"Error obteniendo historial de chat: {e}")
         raise HTTPException(status_code=500, detail="Error al obtener el historial")
