@@ -367,23 +367,30 @@ def emotional_fallback(sentimiento: Optional[str]) -> str:
 
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
 
-async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "") -> Tuple[str, SessionStateSchema]:
+async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "") -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
     """
     Orquestador principal del flujo metamotivacional.
-    Retorna (respuesta_texto, session_actualizada)
+    Retorna (respuesta_texto, session_actualizada, quick_replies)
     """
     
     # 1) Crisis
     if detect_crisis(user_text):
         crisis_msg = "Escucho que estás en un momento muy difícil. Por favor, busca apoyo inmediato: **llama al 4141** (línea gratuita y confidencial del MINSAL). No estás sola/o."
-        return crisis_msg, session
+        return crisis_msg, session, None
     
     # 2) Saludo único
     if not session.greeted:
         session.greeted = True
-        welcome = f"¿Cómo está tu motivación hoy? Puedes elegir un sentimiento o describirlo con tus palabras:\n\n" \
-                  f"Aburrimiento/desconexión · Frustración/atasco · Ansiedad por error · Dispersión/rumiación · Baja autoeficacia · Otro"
-        return welcome, session
+        welcome = f"Hola, soy {AI_NAME} 😊\n\n¿Cómo está tu motivación hoy?"
+        quick_replies = [
+            {"label": "😑 Aburrimiento", "value": "aburrimiento"},
+            {"label": "😤 Frustración", "value": "frustracion"},
+            {"label": "😰 Ansiedad por error", "value": "ansiedad_error"},
+            {"label": "🌀 Dispersión", "value": "dispersion_rumiacion"},
+            {"label": "😔 Baja autoeficacia", "value": "baja_autoeficacia"},
+            {"label": "💭 Otro", "value": "otro"}
+        ]
+        return welcome, session, quick_replies
     
     # 3) Extracción de slots
     try:
@@ -406,15 +413,34 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if missing:
         priority = ["fase", "plazo", "tiempo_bloque"]
         want = next((k for k in priority if k in missing), None)
+        quick_replies = None
         
         if want == "fase":
-            q = "Para ajustar bien la estrategia, ¿en qué fase estás: ideación, planificación, ejecución/redacción o revisión?"
+            q = "Para ajustar bien la estrategia, ¿en qué fase estás?"
+            quick_replies = [
+                {"label": "💡 Ideación", "value": "ideacion"},
+                {"label": "📋 Planificación", "value": "planificacion"},
+                {"label": "✍️ Ejecución/Redacción", "value": "ejecucion"},
+                {"label": "🔍 Revisión", "value": "revision"}
+            ]
         elif want == "plazo":
-            q = "¿Para cuándo es? hoy, <24 h, esta semana o >1 semana?"
+            q = "¿Para cuándo es la entrega?"
+            quick_replies = [
+                {"label": "🔥 Hoy", "value": "hoy"},
+                {"label": "⏰ Mañana (<24h)", "value": "<24h"},
+                {"label": "📅 Esta semana", "value": "esta_semana"},
+                {"label": "🗓️ Más de 1 semana", "value": ">1_semana"}
+            ]
         else:
-            q = "¿Cuánto bloque quieres hoy: 10, 12, 15 o 25 minutos?"
+            q = "¿Cuánto tiempo quieres trabajar en este bloque?"
+            quick_replies = [
+                {"label": "⚡ 10 min", "value": "10"},
+                {"label": "🎯 12 min", "value": "12"},
+                {"label": "💪 15 min", "value": "15"},
+                {"label": "🔥 25 min", "value": "25"}
+            ]
         
-        return q, session
+        return q, session, quick_replies
     
     # Defaults prudentes
     if not new_slots.tiempo_bloque:
@@ -438,14 +464,25 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         if session.last_eval_result and session.last_eval_result.cambio_sentimiento != "↓":
             reply = emotional_fallback(new_slots.sentimiento)
             session.iteration = 0  # Reset
-            return reply, session
+            return reply, session, None
     
     # 7) Generar respuesta del tutor
     reply = render_tutor_turn(session)
     session.iteration += 1
     session.last_strategy = reply
     
-    return reply, session
+    # Ofrecer opciones de evaluación después de dar estrategia
+    quick_replies = None
+    if session.iteration > 1:  # Solo después de la primera estrategia
+        quick_replies = [
+            {"label": "✅ Listo, siguiente", "value": "listo siguiente"},
+            {"label": "😊 Mejoró (↑)", "value": "mejoro"},
+            {"label": "😐 Igual (=)", "value": "igual"},
+            {"label": "😟 Peor (↓)", "value": "peor"},
+            {"label": "🔄 Recalibrar", "value": "recalibrar"}
+        ]
+    
+    return reply, session, quick_replies
 
 
 # ---------------------------- FUNCIONES AUXILIARES ---------------------------- #

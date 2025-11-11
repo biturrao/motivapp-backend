@@ -110,7 +110,7 @@ async def send_message(
         context = build_user_context(db, current_user)
         
         # Procesar con el orquestador metamotivacional
-        ai_response_text, updated_session = await handle_user_turn(
+        ai_response_text, updated_session, quick_replies = await handle_user_turn(
             session=session_schema,
             user_text=request.message,
             context=context
@@ -130,6 +130,7 @@ async def send_message(
         return ChatResponse(
             user_message=ChatMessageSchema.from_orm(user_message),
             ai_message=ChatMessageSchema.from_orm(ai_message),
+            quick_replies=quick_replies,  # Incluir opciones de respuesta rápida
             session_state=updated_session  # Opcional para debugging
         )
         

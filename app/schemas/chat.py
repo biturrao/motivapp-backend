@@ -91,6 +91,12 @@ class ChatMessage(ChatMessageBase):
         from_attributes = True
 
 
+class QuickReply(BaseModel):
+    """Opción de respuesta rápida para el usuario"""
+    label: str  # Texto que se muestra en el botón
+    value: str  # Valor que se envía al backend
+
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -98,6 +104,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     user_message: ChatMessage
     ai_message: ChatMessage
+    quick_replies: Optional[List[QuickReply]] = None  # Opciones de respuesta rápida
     session_state: Optional[SessionStateSchema] = None  # Opcional para debugging
 
 
