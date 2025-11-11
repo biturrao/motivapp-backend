@@ -119,26 +119,6 @@ Cómo estructurar tu respuesta (sin mostrar estos elementos técnicos):
 
 RECUERDA: NO muestres clasificaciones técnicas (A, B, ↑, ↓, promoción, prevención, etc.) al usuario.
 
-
-
-Plantilla de salida obligatoria (no la muestres como plantilla, úsala):
-
-- **Ajuste inferido:** (A|B) · (↑|↓|mixto) · (promoción/eager|prevención/vigilant)
-
-- **Estrategia (3 viñetas máx.)** con UNA sub-tarea verificable (p.ej., "solo bosquejo 5 bullets" / "solo Introducción" / "solo 10 ítems MCQ").
-
-- **Bloque:** 12–15 min (o el tiempo indicado).
-
-- **Mini-evaluación:** 1 pregunta de resultado ("¿lograste X?") + 1 de sensación ("¿cómo cambió tu [sentimiento]? ↑, =, ↓").
-
-- Cierra con una pregunta.
-
-
-Bucle iterativo (el orquestador lleva el contador):
-
-- Si hay progreso (éxito o ↓ del malestar), consolida y avanza al siguiente micro-paso.
-
-- Sin progreso, recalibra en este orden: Q3 (↑↔↓) → tamaño de tarea/tiempo → enfoque (promoción↔prevención) si procede.
 RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 """
 
@@ -375,7 +355,7 @@ def render_estrategia(slots: Slots, Q2: str, Q3: str) -> List[str]:
     return bullets
 
 
-def limit_words(text: str, max_words: int = 140) -> str:
+def limit_words(text: str, max_words: int = 200) -> str:
     """Limita el texto a N palabras"""
     words = text.split()
     if len(words) <= max_words:
@@ -386,7 +366,6 @@ def limit_words(text: str, max_words: int = 140) -> str:
 def render_tutor_turn(session: SessionStateSchema) -> str:
     """Genera la respuesta del tutor en formato Markdown"""
     bloque = session.tiempo_bloque or session.slots.tiempo_bloque or 12
-    ajuste = f"**Ajuste inferido:** {session.Q2} · {session.Q3} · {'promoción/eager' if session.enfoque == 'promocion_eager' else 'prevención/vigilant'}"
     
     bullets = render_estrategia(session.slots, session.Q2, session.Q3)
     estrategia_text = '\n'.join([f"- {b}" for b in bullets])
@@ -396,36 +375,6 @@ def render_tutor_turn(session: SessionStateSchema) -> str:
     full_text = f"{ajuste}\n\n**Estrategia:**\n{estrategia_text}\n- **Bloque:** {bloque} min.\n{mini_eval}"
     
     return limit_words(full_text, 140)
-
-
-# ---------------------------- DERIVACIÓN EMOCIONAL ---------------------------- #
-
-def emotional_fallback(sentimiento: Optional[str]) -> str:
-    """Genera respuesta de derivación a regulación emocional"""
-    if sentimiento == "ansiedad_error":
-        bullets = [
-            "Respiración 4-4-4 durante 2′ (inhalar 4, sostener 4, exhalar 4).",
-            "Define un puente de retorno: reanuda con 1 micro-parte concreta (p.ej., primer párrafo).",
-            "Programa un bloque de 10–12 min con la sub-tarea mínima."
-        ]
-    elif sentimiento in ["frustracion", "dispersion_rumiacion"]:
-        bullets = [
-            "Anclaje 5-4-3-2-1 (3′) para bajar rumiación.",
-            "Reformula sub-meta en 1 línea (resultado observable).",
-            "Reinicia con bloque 10–12 min en la sub-tarea más pequeña."
-        ]
-    else:
-        bullets = [
-            "Micro-relevancia: escribe en 1 línea '¿para qué me sirve esto hoy?'.",
-            "Activación conductual: empieza 2′ cronometrados (cualquier avance cuenta).",
-            "Sigue con bloque 10–12 min acotado."
-        ]
-    
-    head = "**Derivación a regulación emocional (3 ciclos sin progreso)**"
-    estrategia = '\n'.join([f"- {b}" for b in bullets])
-    tail = "- **Mini-evaluación:** ¿Se movió tu sensación (↑, =, ↓)? Retomamos la tarea con el plan propuesto."
-    
-    return limit_words(f"{head}\n\n{estrategia}\n{tail}", 140)
 
 
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
@@ -464,7 +413,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     session.slots = new_slots
     
-    # 4) Si falta dato clave, preguntar
+    # 4) Si falta dato clave, preguntar (solo en las primeras interacciones)
     missing = []
     if not new_slots.tipo_tarea:
         missing.append("tipo_tarea")
@@ -475,8 +424,9 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if not new_slots.tiempo_bloque:
         missing.append("tiempo_bloque")
     
-    if missing and len(missing) > 2:  # Solo preguntar si faltan varias cosas
-        priority = ["tipo_tarea", "fase", "plazo", "tiempo_bloque"]
+    # Preguntar si faltan datos importantes y aún no hemos iterado mucho
+    if missing and session.iteration < 2:
+        priority = ["tipo_tarea", "plazo", "fase", "tiempo_bloque"]
         want = next((k for k in priority if k in missing), None)
         quick_replies = None
         
@@ -532,16 +482,14 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
-    # Detectar si el usuario indica que no mejoró o está peor
+    # Detectar respuestas de evaluación del usuario
     respuestas_sin_mejora = ["no funcionó", "sigo igual", "peor", "no mejoró", "igual", "no ayudó", "no sirvió", "me siento peor"]
+    respuestas_mejora = ["me ayudó", "funcionó", "mejor", "siento mejor", "bien", "genial", "me siento mejor"]
     user_text_lower = user_text.lower()
     sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
-    
-    # Detectar si el usuario mejoró (respuestas positivas)
-    respuestas_mejora = ["me ayudó", "funcionó", "mejor", "siento mejor", "bien", "genial", "me siento mejor"]
     mejora = any(frase in user_text_lower for frase in respuestas_mejora)
     
-    # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida y reiniciar sesión
+    # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida
     if mejora and session.iteration > 0:
         session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
         session.iteration = 0  # Reiniciar para próxima conversación
@@ -554,33 +502,31 @@ Recuerda que siempre puedes volver cuando necesites apoyo o una nueva estrategia
         
         return reply, session, None
     
-    # Si el usuario indica que no hubo mejora, incrementar contador
+    # Si el usuario indica que NO mejoró, incrementar contador de fallos
     if sin_mejora and session.iteration > 0:
-        # Incrementar contador de fallos
         fallos = session.last_eval_result.fallos_consecutivos if session.last_eval_result else 0
         fallos += 1
         session.last_eval_result = EvalResult(fallos_consecutivos=fallos, cambio_sentimiento="=")
-    
-    # 6) Derivación a bienestar si ≥2 estrategias sin mejora
-    if session.last_eval_result and session.last_eval_result.fallos_consecutivos >= 2:
-        # Ofrecer derivación a ejercicios de bienestar
-        reply = f"""Veo que hemos intentado un par de estrategias y todavía no te sientes mejor 😔
+        
+        # Verificar INMEDIATAMENTE si debe ofrecer bienestar (≥2 fallos)
+        if fallos >= 2:
+            reply = f"""Veo que hemos intentado un par de estrategias y todavía no te sientes mejor 😔
 
 A veces lo que sentimos no es solo un tema de organización o método de estudio. El cuerpo y la mente necesitan un respiro antes de seguir intentando.
 
 ¿Qué te parece si primero hacemos un ejercicio breve de bienestar? Hay algunos de respiración, relajación o mindfulness que pueden ayudarte a resetear.
 
 Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
-        
-        quick_replies = [
-            {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
-            {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
-        ]
-        
-        # Reset del contador para que no siga ofreciendo
-        session.last_eval_result = EvalResult(fallos_consecutivos=0)
-        
-        return reply, session, quick_replies
+            
+            quick_replies = [
+                {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
+                {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+            ]
+            
+            # Reset del contador para que no siga ofreciendo
+            session.last_eval_result = EvalResult(fallos_consecutivos=0)
+            
+            return reply, session, quick_replies
     
     # Si el usuario aceptó ir a bienestar
     if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
