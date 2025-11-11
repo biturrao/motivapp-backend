@@ -107,6 +107,20 @@ Ansiedad/Frustración/Baja autoeficacia→priorizar B+↓ con micro-pasos verifi
 Dispersión/Rumiación→acotar alcance y tiempo, siempre ↓.
 
 
+Cómo estructurar tu respuesta (sin mostrar estos elementos técnicos):
+
+- Dale una **estrategia concreta** (máximo 3 pasos simples) con UNA sub-tarea verificable (p.ej., "solo escribe 5 ideas principales" / "solo haz la Introducción" / "solo resuelve 5 ejercicios").
+
+- Sugiere un **bloque de tiempo corto:** 12–15 min (o el tiempo que el estudiante indicó).
+
+- **Pregúntale cómo le fue:** Al final, pregunta si logró la tarea y cómo se siente ahora.
+
+- Cierra con una pregunta amigable para mantener la conversación.
+
+RECUERDA: NO muestres clasificaciones técnicas (A, B, ↑, ↓, promoción, prevención, etc.) al usuario.
+"""
+
+
 Plantilla de salida obligatoria (no la muestres como plantilla, úsala):
 
 - **Ajuste inferido:** (A|B) · (↑|↓|mixto) · (promoción/eager|prevención/vigilant)
@@ -523,18 +537,29 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     user_text_lower = user_text.lower()
     sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
     
+    # Detectar si el usuario mejoró (respuestas positivas)
+    respuestas_mejora = ["me ayudó", "funcionó", "mejor", "siento mejor", "bien", "genial", "me siento mejor"]
+    mejora = any(frase in user_text_lower for frase in respuestas_mejora)
+    
+    # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida y reiniciar sesión
+    if mejora and session.iteration > 0:
+        session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
+        session.iteration = 0  # Reiniciar para próxima conversación
+        
+        reply = f"""¡Qué bueno escuchar eso! 😊 Me alegra mucho que te haya servido.
+
+Recuerda que siempre puedes volver cuando necesites apoyo o una nueva estrategia. Estoy aquí para ayudarte a encontrar tu mejor forma de trabajar.
+
+¡Mucho éxito con tu tarea! 🚀"""
+        
+        return reply, session, None
+    
     # Si el usuario indica que no hubo mejora, incrementar contador
     if sin_mejora and session.iteration > 0:
         # Incrementar contador de fallos
         fallos = session.last_eval_result.fallos_consecutivos if session.last_eval_result else 0
         fallos += 1
         session.last_eval_result = EvalResult(fallos_consecutivos=fallos, cambio_sentimiento="=")
-    elif session.iteration > 0:
-        # Si responde algo positivo, resetear contador
-        respuestas_mejora = ["me ayudó", "funcionó", "mejor", "siento mejor", "bien", "genial"]
-        mejora = any(frase in user_text_lower for frase in respuestas_mejora)
-        if mejora:
-            session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
     
     # 6) Derivación a bienestar si ≥2 estrategias sin mejora
     if session.last_eval_result and session.last_eval_result.fallos_consecutivos >= 2:
@@ -548,7 +573,7 @@ A veces lo que sentimos no es solo un tema de organización o método de estudio
 Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         
         quick_replies = [
-            {"label": "✅ Sí, vamos a intentarlo", "value": "DERIVAR_BIENESTAR"},
+            {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
             {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
         ]
         
@@ -558,7 +583,7 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         return reply, session, quick_replies
     
     # Si el usuario aceptó ir a bienestar
-    if "DERIVAR_BIENESTAR" in user_text.upper():
+    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
         session.iteration = 0  # Reset para cuando vuelva
         session.last_eval_result = EvalResult(fallos_consecutivos=0)
         reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
