@@ -106,6 +106,13 @@ async def send_message(
         session_db = crud_session.get_or_create_session(db, current_user.id)
         session_schema = crud_session.session_to_schema(session_db)
         
+        # Obtener historial reciente de mensajes (últimos 10)
+        chat_history_db = crud_chat.get_user_messages(db, current_user.id, limit=10)
+        chat_history = [
+            {"role": msg.role, "text": msg.text} 
+            for msg in chat_history_db
+        ]
+        
         # Construir contexto del usuario
         context = build_user_context(db, current_user)
         
@@ -113,7 +120,8 @@ async def send_message(
         ai_response_text, updated_session, quick_replies = await handle_user_turn(
             session=session_schema,
             user_text=request.message,
-            context=context
+            context=context,
+            chat_history=chat_history
         )
         
         # Guardar sesión actualizada

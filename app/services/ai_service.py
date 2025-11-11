@@ -35,48 +35,48 @@ model = genai.GenerativeModel('gemini-2.0-flash-exp')
 def get_system_prompt() -> str:
     """Retorna el prompt de sistema completo para Flou"""
     return f"""
-Eres {AI_NAME}, tutor metamotivacional (modelo Miele & Scholer) para estudiantes de educación superior.
-Objetivo: lograr "ajuste Tarea–Motivación" (task–motivation fit) con ciclos breves:
-monitoreo → evaluación → control (estrategia) → evaluación de implementación (recalibración).
+Eres {AI_NAME}, una tutora de motivación que ayuda a estudiantes universitarios.
 
-Reglas duras:
-- Español de Chile, ≤140 palabras por turno, Markdown mínimo en viñetas.
-- Una sola estrategia por turno (máx. 3 viñetas) + mini-evaluación (2 preguntas).
-- Cierre SIEMPRE con una pregunta o acción concreta.
-- Saludo único por sesión (controlado por el orquestador).
-- Si aparece riesgo vital (ideas/planes suicidas), detén el flujo y deriva: "Llama al 4141 (MINSAL). No estás sola/o."
-- No uses lenguaje tecnico avanzado, evita usar simpobolos y explica empaticamente.
+TU PERSONALIDAD:
+- Hablas de forma cercana y amigable, como una compañera mayor
+- Eres empática y validates las emociones antes de dar consejos
+- Explicas todo con lenguaje simple y cotidiano
+- NO uses términos académicos complicados ni símbolos extraños (evita: ↑↓·→)
+- Usa emojis ocasionales para dar calidez 😊
 
-Flujo inverso:
-- El/la estudiante describe libremente "cómo está su motivación" y "qué debe hacer".
-- Extrae silenciosamente: sentimiento, tipo_tarea, ramo, plazo, fase, tiempo_bloque (default 12–15).
-- Si falta 1 dato clave, pregunta SOLO por ese slot (prioridad: fase > plazo > tiempo_bloque). Si no responde, asume defaults prudentes.
+TU OBJETIVO:
+Ayudar al estudiante a encontrar la mejor forma de trabajar según:
+1. Cómo se siente ahora (aburrido, ansioso, frustrado, etc.)
+2. Qué tiene que hacer (ensayo, ejercicios, lectura, etc.)
+3. Para cuándo lo necesita
+4. En qué etapa está (empezando, haciendo, revisando)
 
-Clasificación silenciosa:
-- Q2 (A creativa/divergente vs B analítica/convergente):
-  A si ensayo/borrador/esquema/presentación; fase=ideación/planificación; estructura libre; evaluación por originalidad.
-  B si proofreading/revisión/MCQ/protocolo/problemas/coding/lectura para exactitud; fase=ejecución/revisión; estructura estricta; alto costo de error; plazo corto.
-- Q3 (↑ "por qué" vs ↓ "cómo"):
-  ↑ si ideación/planificación, claridad baja, plazo largo/medio.
-  ↓ si ejecución/revisión, plazo hoy/24h, costo de error alto, ansiedad por error o bloqueo procedimental.
-- Enfoque: Q2=A→promoción/eager; Q2=B→prevención/vigilant.
-- Heurística mixto: 2' en ↑ (propósito/criterio) + bloque principal en ↓ (checklist).
-- Ajuste por sentimiento:
-  Aburrimiento→micro-relevancia antes de ejecutar.
-  Ansiedad/Frustración/Baja autoeficacia→priorizar B+↓ con micro-pasos verificables.
-  Dispersión/Rumiación→acotar alcance y tiempo, siempre ↓.
+CÓMO DAS CONSEJOS:
+1. Primero valida su emoción: "Entiendo que te sientas así cuando..."
+2. Explica brevemente POR QUÉ puede sentirse así
+3. Da UNA estrategia concreta y específica (no listas genéricas)
+4. La estrategia debe tener:
+   - Una tarea pequeña y clara que puede hacer YA
+   - Tiempo sugerido realista (10-25 minutos)
+   - Cómo sabrá que terminó
+5. Termina con una pregunta abierta para seguir conversando
 
-Plantilla de salida obligatoria (no la muestres como plantilla, úsala):
-- **Ajuste inferido:** {{A|B}} · {{↑|↓|mixto}} · {{promoción/eager|prevención/vigilant}}
-- **Estrategia (3 viñetas máx.)** con UNA sub-tarea verificable (p.ej., "solo bosquejo 5 bullets" / "solo Introducción" / "solo 10 ítems MCQ").
-- **Bloque:** {{12–15 min}} (o el tiempo indicado).
-- **Mini-evaluación:** 1 pregunta de resultado ("¿lograste X?") + 1 de sensación ("¿cómo cambió tu [sentimiento]? ↑, =, ↓").
-- Cierra con una pregunta.
+EJEMPLOS DE BUEN CONSEJO:
 
-Bucle iterativo (el orquestador lleva el contador):
-- Si hay progreso (éxito o ↓ del malestar), consolida y avanza al siguiente micro-paso.
-- Sin progreso, recalibra en este orden: Q3 (↑↔↓) → tamaño de tarea/tiempo → enfoque (promoción↔prevención) si procede.
-- Tras 3 iteraciones sin mejora, sugiere ejercicio breve de regulación emocional (según señal) y vuelve con bloque 10–12 min y sub-tarea mínima.
+Mal: "Delimita alcance mínimo: termina SOLO la primera micro-parte"
+Bien: "¿Qué tal si solo escribes las 3 ideas principales en bullets? Sin redactar nada, solo las ideas clave. Unos 10 minutos. Cuando tengas esas 3 ideas, ya avanzaste."
+
+Mal: "Checklist de 3 ítems antes de cerrar: objetivo, evidencia/criterio"
+Bien: "Revisa solo la primera página buscando estos 3 puntos: ¿tiene sentido cada oración? ¿las palabras están bien escritas? ¿usaste bien las comas? 12 minutos, página por página."
+
+REGLAS IMPORTANTES:
+- Responde en español normal de Chile (no jergas ni modismos excesivos)
+- Máximo 200 palabras por respuesta (puedes extenderte si es necesario explicar bien)
+- Si detectas riesgo de suicidio, di: "Por favor llama al 4141 (línea MINSAL gratuita). Están para ayudarte 24/7"
+- Mantén la conversación fluida, recuerda lo que el estudiante te contó antes
+- Adapta tus consejos a lo que ya han intentado juntos
+
+RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 """
 
 
@@ -367,7 +367,7 @@ def emotional_fallback(sentimiento: Optional[str]) -> str:
 
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
 
-async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "") -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
+async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "", chat_history: Optional[List] = None) -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
     """
     Orquestador principal del flujo metamotivacional.
     Retorna (respuesta_texto, session_actualizada, quick_replies)
@@ -383,12 +383,12 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         session.greeted = True
         welcome = f"Hola, soy {AI_NAME} 😊\n\n¿Cómo está tu motivación hoy?"
         quick_replies = [
-            {"label": "😑 Aburrimiento", "value": "aburrimiento"},
-            {"label": "😤 Frustración", "value": "frustracion"},
-            {"label": "😰 Ansiedad por error", "value": "ansiedad_error"},
-            {"label": "🌀 Dispersión", "value": "dispersion_rumiacion"},
-            {"label": "😔 Baja autoeficacia", "value": "baja_autoeficacia"},
-            {"label": "💭 Otro", "value": "otro"}
+            {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
+            {"label": "😤 Frustración", "value": "Siento frustración"},
+            {"label": "😰 Ansiedad", "value": "Siento ansiedad"},
+            {"label": "🌀 Dispersión", "value": "Siento dispersión"},
+            {"label": "😔 Baja motivación", "value": "Tengo baja motivación"},
+            {"label": "💭 Otro", "value": "Siento otra cosa"}
         ]
         return welcome, session, quick_replies
     
@@ -403,6 +403,8 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     # 4) Si falta dato clave, preguntar
     missing = []
+    if not new_slots.tipo_tarea:
+        missing.append("tipo_tarea")
     if not new_slots.fase:
         missing.append("fase")
     if not new_slots.plazo:
@@ -410,41 +412,49 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if not new_slots.tiempo_bloque:
         missing.append("tiempo_bloque")
     
-    if missing:
-        priority = ["fase", "plazo", "tiempo_bloque"]
+    if missing and len(missing) > 2:  # Solo preguntar si faltan varias cosas
+        priority = ["tipo_tarea", "fase", "plazo", "tiempo_bloque"]
         want = next((k for k in priority if k in missing), None)
         quick_replies = None
         
-        if want == "fase":
-            q = "Para ajustar bien la estrategia, ¿en qué fase estás?"
+        if want == "tipo_tarea":
+            q = "¿Qué tipo de trabajo tienes que hacer?"
             quick_replies = [
-                {"label": "💡 Ideación", "value": "ideacion"},
-                {"label": "📋 Planificación", "value": "planificacion"},
-                {"label": "✍️ Ejecución/Redacción", "value": "ejecucion"},
-                {"label": "🔍 Revisión", "value": "revision"}
+                {"label": "📝 Escribir algo", "value": "Tengo que escribir un trabajo"},
+                {"label": "📖 Leer/Estudiar", "value": "Tengo que leer y estudiar"},
+                {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
+                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"}
+            ]
+        elif want == "fase":
+            q = "¿En qué etapa estás?"
+            quick_replies = [
+                {"label": "💡 Recién empezando", "value": "Estoy en la fase de ideacion"},
+                {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
+                {"label": "✍️ Haciendo el trabajo", "value": "Estoy en la fase de ejecucion"},
+                {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
             ]
         elif want == "plazo":
-            q = "¿Para cuándo es la entrega?"
+            q = "¿Para cuándo lo necesitas?"
             quick_replies = [
-                {"label": "🔥 Hoy", "value": "hoy"},
-                {"label": "⏰ Mañana (<24h)", "value": "<24h"},
-                {"label": "📅 Esta semana", "value": "esta_semana"},
-                {"label": "🗓️ Más de 1 semana", "value": ">1_semana"}
+                {"label": "🔥 Hoy", "value": "Es para hoy"},
+                {"label": "⏰ Mañana", "value": "Es para mañana"},
+                {"label": "📅 Esta semana", "value": "Es para esta semana"},
+                {"label": "🗓️ Más adelante", "value": "Tengo más de una semana"}
             ]
         else:
-            q = "¿Cuánto tiempo quieres trabajar en este bloque?"
+            q = "¿Cuánto tiempo tienes disponible ahora?"
             quick_replies = [
                 {"label": "⚡ 10 min", "value": "10"},
-                {"label": "🎯 12 min", "value": "12"},
-                {"label": "💪 15 min", "value": "15"},
-                {"label": "🔥 25 min", "value": "25"}
+                {"label": "🎯 15 min", "value": "15"},
+                {"label": "💪 25 min", "value": "25"},
+                {"label": "🔥 Más tiempo", "value": "Tengo más tiempo"}
             ]
         
         return q, session, quick_replies
     
     # Defaults prudentes
     if not new_slots.tiempo_bloque:
-        new_slots.tiempo_bloque = 12
+        new_slots.tiempo_bloque = 15
         session.slots.tiempo_bloque = 12
     
     # 5) Inferir Q2, Q3, enfoque
@@ -466,21 +476,59 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
             session.iteration = 0  # Reset
             return reply, session, None
     
-    # 7) Generar respuesta del tutor
-    reply = render_tutor_turn(session)
+    # 7) Generar respuesta conversacional usando Gemini con historial
+    try:
+        llm_model = genai.GenerativeModel(
+            model_name='gemini-2.0-flash-exp',
+            system_instruction=get_system_prompt()
+        )
+        
+        # Construir el historial de conversación para Gemini
+        history = []
+        if chat_history:
+            for msg in chat_history[:-1]:  # Excluir el último mensaje del usuario (ya lo pasaremos aparte)
+                history.append({
+                    "role": "user" if msg["role"] == "user" else "model",
+                    "parts": [msg["text"]]
+                })
+        
+        # Agregar contexto adicional si existe
+        info_contexto = f"""
+[Info contextual - úsala para personalizar tu respuesta]:
+- Sentimiento: {new_slots.sentimiento or 'no especificado'}
+- Tarea: {new_slots.tipo_tarea or 'no especificada'} {f"de {new_slots.ramo}" if new_slots.ramo else ""}
+- Plazo: {new_slots.plazo or 'no especificado'}
+- Fase: {new_slots.fase or 'no especificada'}
+- Tiempo disponible: {new_slots.tiempo_bloque or 15} minutos
+{context if context else ""}
+"""
+        
+        # Iniciar chat con historial
+        chat = llm_model.start_chat(history=history)
+        
+        # Enviar mensaje actual con contexto
+        full_message = f"{info_contexto}\n\nEstudiante: {user_text}"
+        response = chat.send_message(
+            full_message,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.8,
+                max_output_tokens=400,  # Aumentado para dar mejores explicaciones
+                top_p=0.95
+            )
+        )
+        
+        reply = response.text.strip()
+        
+    except Exception as e:
+        logger.error(f"Error generando respuesta conversacional: {e}")
+        # Fallback simple y empático
+        reply = f"Entiendo, cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo es y para cuándo lo necesitas?"
+    
     session.iteration += 1
     session.last_strategy = reply
     
-    # Ofrecer opciones de evaluación después de dar estrategia
+    # No ofrecer quick replies en respuestas conversacionales - dejar fluir la conversación
     quick_replies = None
-    if session.iteration > 1:  # Solo después de la primera estrategia
-        quick_replies = [
-            {"label": "✅ Listo, siguiente", "value": "listo siguiente"},
-            {"label": "😊 Mejoró (↑)", "value": "mejoro"},
-            {"label": "😐 Igual (=)", "value": "igual"},
-            {"label": "😟 Peor (↓)", "value": "peor"},
-            {"label": "🔄 Recalibrar", "value": "recalibrar"}
-        ]
     
     return reply, session, quick_replies
 
