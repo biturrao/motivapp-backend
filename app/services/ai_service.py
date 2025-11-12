@@ -493,6 +493,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if mejora and session.iteration > 0:
         session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
         session.iteration = 0  # Reiniciar para próxima conversación
+        session.greeted = False  # Permitir nuevo saludo en próxima sesión
         
         reply = f"""¡Qué bueno escuchar eso! 😊 Me alegra mucho que te haya servido.
 
@@ -527,6 +528,9 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
             session.last_eval_result = EvalResult(fallos_consecutivos=0)
             
             return reply, session, quick_replies
+        
+        # Si aún no llega a 2 fallos, continuar para generar nueva estrategia
+        # NO hacer return aquí, dejar que el código siga y genere nueva estrategia
     
     # Si el usuario aceptó ir a bienestar
     if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
