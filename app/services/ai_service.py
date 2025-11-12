@@ -482,6 +482,16 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
+    # PRIMERO: Verificar si el usuario aceptó ir a bienestar (antes de otras detecciones)
+    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
+        session.iteration = 0  # Reset para cuando vuelva
+        session.last_eval_result = EvalResult(fallos_consecutivos=0)
+        reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
+        quick_replies = [
+            {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
+        ]
+        return reply, session, quick_replies
+    
     # Detectar respuestas de evaluación del usuario
     # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
     respuestas_sin_mejora = [
@@ -547,16 +557,6 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         
         # Si aún no llega a 2 fallos, continuar para generar nueva estrategia
         # NO hacer return aquí, dejar que el código siga y genere nueva estrategia
-    
-    # Si el usuario aceptó ir a bienestar
-    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
-        session.iteration = 0  # Reset para cuando vuelva
-        session.last_eval_result = EvalResult(fallos_consecutivos=0)
-        reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
-        quick_replies = [
-            {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
-        ]
-        return reply, session, quick_replies
     
     # 7) Generar respuesta conversacional usando Gemini con historial
     try:
