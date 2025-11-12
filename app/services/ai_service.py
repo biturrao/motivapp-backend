@@ -393,7 +393,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     # 2) Saludo único
     if not session.greeted:
         session.greeted = True
-        welcome = f"Hola, soy {AI_NAME} 😊\n\n¿Cómo está tu motivación hoy?"
+        welcome = "😊 ¿Cómo está tu motivación hoy?"
         quick_replies = [
             {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
             {"label": "😤 Frustración", "value": "Siento frustración"},
