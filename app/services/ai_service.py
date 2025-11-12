@@ -483,11 +483,27 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
     # Detectar respuestas de evaluación del usuario
-    respuestas_sin_mejora = ["no funcionó", "sigo igual", "peor", "no mejoró", "igual", "no ayudó", "no sirvió", "me siento peor"]
-    respuestas_mejora = ["me ayudó", "funcionó", "mejor", "siento mejor", "bien", "genial", "me siento mejor"]
-    user_text_lower = user_text.lower()
+    # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
+    respuestas_sin_mejora = [
+        "no funcionó", "no funciono", "no me funcionó", "no me ayudó", "no me ayudo",
+        "sigo igual", "estoy igual", "igual que antes",
+        "peor", "me siento peor", "estoy peor", "más mal",
+        "no mejoró", "no mejoro", "no ayudó", "no ayudo", 
+        "no sirvió", "no sirvio"
+    ]
+    respuestas_mejora = [
+        "me ayudó", "me ayudo", "sí me ayudó", "si me ayudo",
+        "funcionó bien", "funciono bien", "sí funcionó", "si funciono",
+        "mejor", "me siento mejor", "estoy mejor", "mucho mejor",
+        "bien", "muy bien", "genial", "excelente", "perfecto"
+    ]
+    
+    user_text_lower = user_text.lower().strip()
+    
+    # Verificar sin_mejora PRIMERO (tiene frases más específicas con "no")
     sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
-    mejora = any(frase in user_text_lower for frase in respuestas_mejora)
+    # Solo verificar mejora si NO detectó sin_mejora (para evitar conflictos)
+    mejora = False if sin_mejora else any(frase in user_text_lower for frase in respuestas_mejora)
     
     # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida
     if mejora and session.iteration > 0:
