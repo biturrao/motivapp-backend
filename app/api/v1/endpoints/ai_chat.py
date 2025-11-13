@@ -223,11 +223,10 @@ async def get_chat_history(
                 
                 # Si el mensaje menciona bienestar, es probable que sea oferta de derivación
                 if "bienestar" in last_message_text and "ejercicio" in last_message_text:
-                    # Ya tiene sus propios quick replies de derivación
                     if "quieres probar" in last_message_text or "¿quieres" in last_message_text:
                         quick_replies = [
-                            {"label": "✅ Sí, vamos a intentarlo", "value": "DERIVAR_BIENESTAR"},
-                            {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+                            {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
+                            {"label": "🔄 Seguir con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
                         ]
                     elif "ir a bienestar" in last_message_text or "sección de bienestar" in last_message_text:
                         quick_replies = [

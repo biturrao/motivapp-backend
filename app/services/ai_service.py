@@ -494,26 +494,24 @@ def _generate_fallback_response(slots: Slots, user_text: str) -> str:
     
     # Nivel 4: Detectar palabras clave en el texto actual para dar respuesta contextual
     if re.search(r'\b(programar|código|chatbot|app|software)\b', user_text.lower()):
-        return "Entiendo que tienes que programar. Te sugiero: enfócate en una sola funcionalidad pequeña. Sin intentar hacer todo. Dedica unos 20 minutos a esa parte específica. ¿Qué parte del proyecto podrías empezar?"
+        return "Enfoquemos la programación en micro-tramos: elige UNA funcionalidad pequeña, abre el archivo y deja solo lo necesario para esa parte. Trabaja 18 minutos, prueba lo que hiciste y luego me cuentas si necesitas otro ajuste."
     
     if re.search(r'\b(leer|estudiar|libro|paper|artículo)\b', user_text.lower()):
-        return "Entiendo que tienes que leer. Te propongo: lee solo 5-10 minutos marcando las ideas principales, sin tomar apuntes extensos. ¿De qué tema es la lectura?"
+        return "Para lectura técnica usa modo barrido: cronometra 12 minutos, subraya solo ideas fuerza y deja un post-it con la duda más grande. Así mantenemos foco sin agobiarnos."
     
     if re.search(r'\b(escribir|ensayo|texto|redactar)\b', user_text.lower()):
-        return "Entiendo que tienes que escribir. Te sugiero empezar pequeño: escribe solo 3 ideas o bullets de lo que quieres decir. Sin redactar completo. 10 minutos. ¿Sobre qué tema es?"
+        return "Vamos con escritura guiada: escribe tres bullets con idea principal, ejemplo y frase de cierre. Nada de redactar completo todavía; solo estructura rápida en 10 minutos y luego vemos si extendemos."
     
     if re.search(r'\b(ejercicio|problema|matemática|física|cálculo)\b', user_text.lower()):
-        return "Entiendo que tienes ejercicios. Te propongo: resuelve solo 3 ejercicios, sin presión de terminar todo. Unos 15 minutos. ¿De qué materia son?"
+        return "Divide los ejercicios en un lote mínimo: resuelve solo 2-3 problemas gemelos, anota los pasos clave y detente para revisar patrones. 15 minutos bastan para destrabar."
     
     # Nivel 5: Respuesta genérica pero útil (siempre funciona)
-    return f"""Entiendo que necesitas apoyo. Soy {AI_NAME}, tu asistente metamotivacional.
-
-Para ayudarte mejor, cuéntame:
-- ¿Qué tipo de trabajo tienes que hacer?
-- ¿Para cuándo lo necesitas?
-- ¿Cómo te sientes ahora?
-
-Con esa información puedo darte una estrategia concreta y realista. 😊"""
+    return (
+        f"Vamos directo a la acción. Haz este micro-plan estándar:\n"
+        "1. Anota en un post-it qué quieres dejar listo en los próximos 12 minutos.\n"
+        "2. Trabaja ese bloque con el celular lejos y enfócate solo en completar ese mini entregable.\n"
+        "3. Al terminar, marca lo logrado y dime si necesitamos cambiar la táctica."
+    )
 
 
 def _get_strategy_by_emotion(sentimiento: str, slots: Slots) -> str:
@@ -675,32 +673,6 @@ def _detect_fit_gap(slots: Slots) -> Optional[str]:
     
     return None
 
-
-def _try_minimal_prompt(llm_model, user_text: str, slots: Slots, gen_config, safety_settings) -> Optional[str]:
-    """Último intento muy corto para evitar bloqueos por seguridad"""
-    try:
-        resumen_slots = f"Tarea: {slots.tipo_tarea or 'desconocida'} | Sentimiento: {slots.sentimiento or 'desconocido'} | Plazo: {slots.plazo or 'desconocido'} | Fase: {slots.fase or 'desconocida'}"
-        minimal_prompt = (
-            f"Actúa como {AI_NAME} y responde en español chileno con tono cálido. "
-            "Valida la emoción, da un micro-plan (<=3 pasos) y termina con una pregunta abierta.\n"
-            f"Contexto: {resumen_slots}.\nUsuario: {user_text}"
-        )
-        response = llm_model.generate_content(
-            minimal_prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=gen_config.temperature,
-                max_output_tokens=gen_config.max_output_tokens,
-                top_p=gen_config.top_p
-            ),
-            safety_settings=safety_settings
-        )
-        if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-            return response.candidates[0].content.parts[0].text.strip()
-    except Exception as exc:
-        logger.error(f"Minimal prompt también falló: {exc}")
-    return None
-
-
 def _refresh_repeated_response(new_reply: str, last_reply: Optional[str], user_text: str) -> str:
     """Evita respuestas idénticas agregando reconocimiento del aporte del usuario"""
     if not last_reply or not new_reply:
@@ -713,6 +685,15 @@ def _refresh_repeated_response(new_reply: str, last_reply: Optional[str], user_t
     elif len(detail) > 80:
         detail = detail[:80].rstrip() + "..."
     return f"Anotado lo que dices (\"{detail}\"). Mantengamos la micro-estrategia, pero avísame si quieres ajustarla:\n\n{new_reply}"
+
+
+def _evaluation_quick_replies() -> List[Dict[str, str]]:
+    """Opciones estándar para evaluar la estrategia"""
+    return [
+        {"label": "✅ Me ayudó", "value": "me ayudó"},
+        {"label": "😐 Sigo igual", "value": "sigo igual"},
+        {"label": "😟 No me sirvió", "value": "no funcionó"}
+    ]
 
 
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
@@ -762,50 +743,8 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if not new_slots.tiempo_bloque:
         missing.append("tiempo_bloque")
     
-    # Preguntar si faltan datos importantes SOLO si falta información crítica
-    # Y SOLO en las primeras 2 iteraciones para no ser repetitivo
-    if missing and session.iteration < 2:
-        priority = ["sentimiento", "tipo_tarea", "plazo", "fase", "tiempo_bloque"]
-        want = next((k for k in priority if k in missing), None)
-        
-        # Solo preguntar si realmente necesitamos el dato para dar una estrategia
-        if want and want in ["sentimiento", "tipo_tarea", "plazo"]:  # Datos más críticos
-            quick_replies = None
-            
-            if want == "sentimiento":
-                q = "¿Cómo anda tu motivación hoy? Cuéntame cómo te sientes para ajustar la estrategia."
-                quick_replies = [
-                    {"label": "😴 Sin ganas", "value": "Me siento sin ganas y todo me da lata"},
-                    {"label": "😰 Ansioso/a", "value": "Estoy ansioso y temo equivocarme"},
-                    {"label": "😡 Frustrado/a", "value": "Estoy frustrado porque nada resulta"},
-                    {"label": "🌪️ Disperso/a", "value": "Tengo la mente en mil cosas y no me enfoco"},
-                    {"label": "😔 Dudo de mí", "value": "Siento que no soy capaz de lograrlo"}
-                ]
-            elif want == "tipo_tarea":
-                q = "¿Qué tipo de trabajo tienes que hacer?"
-                quick_replies = [
-                    {"label": "📝 Escribir algo", "value": "Tengo que escribir un trabajo"},
-                    {"label": "📖 Leer/Estudiar", "value": "Tengo que leer y estudiar"},
-                    {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
-                    {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
-                    {"label": "🎤 Presentar", "value": "Tengo que preparar una presentación"},
-                    {"label": "💻 Programar", "value": "Tengo que programar y avanzar en mi código"}
-                ]
-            elif want == "plazo":
-                q = "¿Para cuándo lo necesitas?"
-                quick_replies = [
-                    {"label": "🔥 Hoy", "value": "Es para hoy"},
-                    {"label": "⏰ Mañana", "value": "Es para mañana"},
-                    {"label": "📅 Esta semana", "value": "Es para esta semana"},
-                    {"label": "🗓️ Más adelante", "value": "Tengo más de una semana"},
-                    {"label": "⏳ No es urgente", "value": "No es urgente, puedo hacerlo con calma"}
-                ]
-            
-            # Solo retornar si tenemos quick_replies (pregunta crítica)
-            if quick_replies:
-                return q, session, quick_replies
-        
-        # Si falta fase o tiempo, no preguntar explícitamente, usar defaults y continuar
+    if missing:
+        logger.debug(f"Slots incompletos para estrategia: {missing}. Continuando con heurísticas.")
     
     # Defaults prudentes
     if not new_slots.tiempo_bloque:
@@ -888,8 +827,8 @@ A veces lo que sentimos no es solo un tema de organización o método de estudio
 Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
             
             quick_replies = [
-                {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
-                {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+                {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
+                {"label": "🔄 Seguir con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
             ]
             
             # Reset del contador para que no siga ofreciendo
@@ -921,14 +860,13 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         # NO hacer return aquí, dejar que el código siga y genere nueva estrategia
     
     # 7) Generar respuesta conversacional usando Gemini con historial
+    reply = None
     try:
         llm_model = genai.GenerativeModel(
-            model_name='gemini-2.5-pro',
+            model_name='gemini-2.0-flash-exp',
             system_instruction=get_system_prompt()
         )
         
-        # Construir el historial de conversación para Gemini
-        # LIMITAR a últimos 10 mensajes para evitar contexto muy largo
         history = []
         if chat_history:
             recent_history = chat_history[-11:-1] if len(chat_history) > 11 else chat_history[:-1]
@@ -938,7 +876,6 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
                     "parts": [msg["text"]]
                 })
         
-        # Agregar contexto adicional si existe
         info_contexto = f"""
 [Info contextual]:
 - Sentimiento: {new_slots.sentimiento or 'no especificado'}
@@ -948,11 +885,10 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
 - Tiempo: {new_slots.tiempo_bloque or 15} min
 """
         
-        # Configuración de seguridad y generación
         gen_config = genai.types.GenerationConfig(
-            temperature=0.8,
+            temperature=0.75,
             max_output_tokens=400,
-            top_p=0.95
+            top_p=0.9
         )
         
         safety_settings = [
@@ -962,69 +898,33 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
         
-        # Intento 1: Con historial
-        try:
-            chat = llm_model.start_chat(history=history)
-            full_message = f"{info_contexto}\n\nEstudiante: {user_text}"
-            response = chat.send_message(
-                full_message,
-                generation_config=gen_config,
-                safety_settings=safety_settings
-            )
-            
-            # Verificar respuesta válida
-            if response.candidates and len(response.candidates) > 0:
-                candidate = response.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    reply = candidate.content.parts[0].text.strip()
-                else:
-                    # Finish reason 2 = bloqueado por seguridad
-                    logger.warning(f"Respuesta bloqueada. Finish reason: {candidate.finish_reason}. Reintentando sin historial...")
-                    raise Exception("Blocked by safety filters")
-            else:
-                raise Exception("No candidates in response")
-                
-        except Exception as e:
-            # Intento 2: Sin historial (solo mensaje actual)
-            logger.info(f"Reintentando sin historial debido a: {e}")
-            try:
-                chat = llm_model.start_chat(history=[])
-                simple_message = f"{info_contexto}\n\nEstudiante: {user_text}"
-                response = chat.send_message(
-                    simple_message,
-                    generation_config=gen_config,
-                    safety_settings=safety_settings
-                )
-                
-                if response.candidates and len(response.candidates) > 0:
-                    candidate = response.candidates[0]
-                    if candidate.content and candidate.content.parts:
-                        reply = candidate.content.parts[0].text.strip()
-                    else:
-                        logger.warning(f"Segundo intento bloqueado. Finish reason: {candidate.finish_reason}. Lanzando prompt mínimo...")
-                        raise Exception("Blocked twice")
-                else:
-                    raise Exception("No candidates in response")
-            except Exception as inner_exc:
-                logger.info(f"Usando prompt mínimo debido a: {inner_exc}")
-                minimal_reply = _try_minimal_prompt(llm_model, user_text, new_slots, gen_config, safety_settings)
-                if minimal_reply:
-                    reply = minimal_reply
-                else:
-                    reply = _generate_fallback_response(new_slots, user_text)
+        chat = llm_model.start_chat(history=history)
+        full_message = f"{info_contexto}\n\nEstudiante: {user_text}"
+        response = chat.send_message(
+            full_message,
+            generation_config=gen_config,
+            safety_settings=safety_settings
+        )
         
+        if not response.candidates:
+            raise RuntimeError("Gemini devolvió una respuesta vacía")
+        candidate = response.candidates[0]
+        finish_reason = getattr(candidate, "finish_reason", None)
+        blocked = finish_reason in (2, "SAFETY", "BLOCKED", "SAFETY_BLOCK")
+        if blocked or not candidate.content or not candidate.content.parts:
+            raise RuntimeError(f"Respuesta bloqueada o vacía (finish_reason={finish_reason})")
+        reply = candidate.content.parts[0].text.strip()
+        if not reply:
+            raise RuntimeError("Respuesta sin texto utilizable")
     except Exception as e:
-        logger.error(f"Error generando respuesta conversacional: {e}")
-        # Fallback simple y empático
-        reply = f"Entiendo. Cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo tienes y para cuándo es?"
+        logger.warning(f"Falló la generación con Gemini, usando estrategia interna: {e}")
+        reply = _generate_fallback_response(new_slots, user_text)
     
     reply = _refresh_repeated_response(reply, session.last_strategy, user_text)
     session.iteration += 1
     session.last_strategy = reply
     
-    # NO enviar quick replies automáticamente - dejar que el usuario responda naturalmente
-    # Solo enviar quick replies cuando explicitamente preguntamos algo específico
-    quick_replies = None
+    quick_replies = _evaluation_quick_replies()
     
     return reply, session, quick_replies
 
