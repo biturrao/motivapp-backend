@@ -70,7 +70,7 @@ Mal: "Checklist de 3 ítems antes de cerrar: objetivo, evidencia/criterio"
 Bien: "Revisa solo la primera página buscando estos 3 puntos: ¿tiene sentido cada oración? ¿las palabras están bien escritas? ¿usaste bien las comas? 12 minutos, página por página."
 
 REGLAS IMPORTANTES:
-- Responde en español normal de Chile (no jergas ni modismos excesivos)
+- Responde en español normal de Chile (no jergas ni modismos)
 - Máximo 200 palabras por respuesta (puedes extenderte si es necesario explicar bien)
 - Si detectas riesgo de suicidio, di: "Por favor llama al 4141 (línea MINSAL gratuita). Están para ayudarte 24/7"
 - Mantén la conversación fluida, recuerda lo que el estudiante te contó antes
@@ -78,36 +78,7 @@ REGLAS IMPORTANTES:
 - NUNCA muestres al usuario cosas técnicas como "Ajuste inferido: A·↑" o símbolos como ↑↓·→
 - NO uses plantillas visibles, habla naturalmente
 
-IMPORTANTE: Toda la clasificación (Q2, Q3, enfoque) es INTERNA, NUNCA la menciones al usuario.
-
-Clasificación silenciosa:
-
-- Q2 (A creativa/divergente vs B analítica/convergente):
-
-A si ensayo/borrador/esquema/presentación; fase=ideación/planificación; estructura libre; evaluación por originalidad.
-
-B si proofreading/revisión/MCQ/protocolo/problemas/coding/lectura para exactitud; fase=ejecución/revisión; estructura estricta; alto costo de error; plazo corto.
-
-- Q3 (↑ "por qué" vs ↓ "cómo"):
-
-↑ si ideación/planificación, claridad baja, plazo largo/medio.
-
-↓ si ejecución/revisión, plazo hoy/24h, costo de error alto, ansiedad por error o bloqueo procedimental.
-
-- Enfoque: Q2=A→promoción/eager; Q2=B→prevención/vigilant.
-
-- Heurística mixto: 2' en ↑ (propósito/criterio) + bloque principal en ↓ (checklist).
-
-- Ajuste por sentimiento:
-
-Aburrimiento→micro-relevancia antes de ejecutar.
-
-Ansiedad/Frustración/Baja autoeficacia→priorizar B+↓ con micro-pasos verificables.
-
-Dispersión/Rumiación→acotar alcance y tiempo, siempre ↓.
-
-
-Cómo estructurar tu respuesta (sin mostrar estos elementos técnicos):
+Cómo estructurar tu respuesta:
 
 - Dale una **estrategia concreta** (máximo 3 pasos simples) con UNA sub-tarea verificable (p.ej., "solo escribe 5 ideas principales" / "solo haz la Introducción" / "solo resuelve 5 ejercicios").
 
@@ -321,62 +292,6 @@ def infer_q2_q3(slots: Slots) -> Tuple[str, str, str]:
     return Q2, Q3, enfoque
 
 
-# ---------------------------- RENDER DE ESTRATEGIA ---------------------------- #
-
-def render_estrategia(slots: Slots, Q2: str, Q3: str) -> List[str]:
-    """Genera las viñetas de estrategia según Q2/Q3"""
-    bullets = []
-    bloque = slots.tiempo_bloque or 12
-    
-    if Q2 == "B" and (Q3 == "↓" or Q3 == "mixto"):
-        # Analítica/precisión
-        tipo = "párrafo" if slots.tipo_tarea == "proofreading" else "sección"
-        bullets.append(f"Objetivo del bloque: '0 errores' en una parte pequeña ({tipo}).")
-        bullets.append(f"Checklist ({bloque - 2} min): cifras/unidades · criterios de pauta · puntuación/consistencia.")
-        bullets.append("Técnica anti-ansiedad: lectura en voz alta + dedo en línea (ritmo estable).")
-        return bullets
-    
-    if Q3 == "mixto":
-        bullets.append("2′ de propósito (↑): escribe en 1 línea la pregunta central/criterio.")
-        bullets.append(f"{bloque - 2}′ de 'cómo' (↓): bosquejo con 5 bullets (tesis, 2 argumentos, contraargumento, cierre).")
-        bullets.append("Micro-tarea verificable: SOLO bosquejo, sin redacción fina.")
-        return bullets
-    
-    if Q3 == "↑":
-        bullets.append("2′ define el 'por qué': meta/criterio de calidad en 1 línea (foto/nota visible).")
-        bullets.append(f"{bloque - 2}′ plan en 4 pasos: qué harás primero, luego, después, cierre.")
-        bullets.append("Evita distracciones: temporizador + pantalla completa (sin pestañas).")
-        return bullets
-    
-    # Q3 = "↓" genérico
-    bullets.append("Delimita alcance mínimo: termina SOLO la primera micro-parte (p.ej., 1 párrafo / 5 ítems).")
-    bullets.append("Checklist de 3 ítems antes de cerrar: objetivo, evidencia/criterio, revisión rápida.")
-    bullets.append("Marca progreso con ✔ y detente al sonar el temporizador.")
-    return bullets
-
-
-def limit_words(text: str, max_words: int = 200) -> str:
-    """Limita el texto a N palabras"""
-    words = text.split()
-    if len(words) <= max_words:
-        return text
-    return ' '.join(words[:max_words]) + '…'
-
-
-def render_tutor_turn(session: SessionStateSchema) -> str:
-    """Genera la respuesta del tutor en formato Markdown"""
-    bloque = session.tiempo_bloque or session.slots.tiempo_bloque or 12
-    
-    bullets = render_estrategia(session.slots, session.Q2, session.Q3)
-    estrategia_text = '\n'.join([f"- {b}" for b in bullets])
-    
-    mini_eval = f"- **Mini-evaluación:** ¿Lograste la sub-tarea? ¿Cómo cambió tu sensación (↑, =, ↓)? ¿Hacemos otro bloque o recalibramos?"
-    
-    full_text = f"{ajuste}\n\n**Estrategia:**\n{estrategia_text}\n- **Bloque:** {bloque} min.\n{mini_eval}"
-    
-    return limit_words(full_text, 140)
-
-
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
 
 async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "", chat_history: Optional[List] = None) -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
@@ -554,6 +469,27 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
             session.last_eval_result = EvalResult(fallos_consecutivos=0)
             
             return reply, session, quick_replies
+        
+        # ****** INICIO DE LA NUEVA LÓGICA DE RECALIBRACIÓN (SI FALLOS=1) ******
+        if fallos < 2:
+            logger.info(f"Recalibrando estrategia... (Fallo {fallos})")
+            
+            # 1. Cambiar Q3 (de ↑→↓ o viceversa)
+            if session.Q3 == "↑":
+                session.Q3 = "↓"
+            elif session.Q3 == "↓":
+                session.Q3 = "↑"
+            
+            # 2. Ajustar tamaño de tarea (hacerla más pequeña)
+            if session.tiempo_bloque and session.tiempo_bloque > 10:
+                session.tiempo_bloque = 10  # Forzar bloque más corto
+            else:
+                session.tiempo_bloque = 10
+            
+            # Actualizar los slots para que la generación de respuesta use el tiempo acortado
+            session.slots.tiempo_bloque = 10
+            logger.info(f"Nueva Q3: {session.Q3}, Nuevo tiempo: {session.tiempo_bloque}")
+        # ****** FIN DE LA NUEVA LÓGICA DE RECALIBRACIÓN ******
         
         # Si aún no llega a 2 fallos, continuar para generar nueva estrategia
         # NO hacer return aquí, dejar que el código siga y genere nueva estrategia

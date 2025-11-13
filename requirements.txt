@@ -11,6 +11,8 @@ psycopg2-binary==2.9.9
 passlib==1.7.4
 bcrypt==3.2.0
 python-jose[cryptography]==3.3.0
+pytest
+pytest-cov
 
 # Configuración
 pydantic-settings==2.5.2

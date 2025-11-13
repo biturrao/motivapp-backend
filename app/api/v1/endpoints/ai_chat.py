@@ -148,20 +148,61 @@ async def send_message(
 
 
 @router.get("/history", response_model=ChatHistoryResponse)
-def get_chat_history(
+async def get_chat_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Obtiene el historial de chat del usuario actual.
     Incluye quick_replies en el último mensaje si corresponde.
+    Si no hay historial, inicia la conversación con el saludo de Flou.
     """
     try:
         messages = crud_chat.get_user_messages(db, current_user.id)
         
-        # Si no hay mensajes, retornar vacío
+        # Si no hay mensajes, iniciar conversación con el saludo
         if not messages:
-            return ChatHistoryResponse(messages=[])
+            session_db = crud_session.get_or_create_session(db, current_user.id)
+            session_schema = crud_session.session_to_schema(session_db)
+            
+            if not session_schema.greeted:
+                logger.info(f"Usuario {current_user.id} sin historial, iniciando saludo.")
+                # Trigger del saludo llamando a handle_user_turn
+                # con un texto de usuario vacío
+                
+                # Construir contexto (necesario para el primer turno)
+                context = build_user_context(db, current_user)
+                
+                welcome_text, updated_session, quick_replies = await handle_user_turn(
+                    session=session_schema,
+                    user_text="",  # Texto vacío para disparar el saludo
+                    context=context,
+                    chat_history=[]
+                )
+                
+                # Guardar la sesión actualizada (greeted=True)
+                crud_session.update_session(db, current_user.id, updated_session)
+                
+                # Guardar el mensaje de bienvenida de la IA en el historial
+                ai_message = crud_chat.create_message(
+                    db=db,
+                    user_id=current_user.id,
+                    role='model',
+                    text=welcome_text
+                )
+                
+                # Preparar la respuesta para el frontend
+                welcome_msg_schema = ChatMessageSchema.from_orm(ai_message)
+                
+                # Adjuntar los quick replies al schema
+                last_msg_dict = welcome_msg_schema.dict()
+                last_msg_dict['quick_replies'] = quick_replies
+                
+                return ChatHistoryResponse(messages=[ChatMessageSchema(**last_msg_dict)])
+            
+            else:
+                # El usuario ya fue saludado pero borró su historial
+                return ChatHistoryResponse(messages=[])
         
         # Convertir mensajes a schema
         message_list = [ChatMessageSchema.from_orm(msg) for msg in messages]
