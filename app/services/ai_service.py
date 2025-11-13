@@ -371,16 +371,9 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     # 2) Saludo único
     if not session.greeted:
         session.greeted = True
-        welcome = "😊 ¿Cómo está tu motivación hoy?"
-        quick_replies = [
-            {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
-            {"label": "😤 Frustración", "value": "Siento frustración"},
-            {"label": "😰 Ansiedad", "value": "Siento ansiedad"},
-            {"label": "🌀 Dispersión", "value": "Siento dispersión"},
-            {"label": "😔 Baja motivación", "value": "Tengo baja motivación"},
-            {"label": "💭 Otro", "value": "Siento otra cosa"}
-        ]
-        return welcome, session, quick_replies
+        welcome = f"Hola! 👋 Soy {AI_NAME}, tu asistente metamotivacional.\n\nEstoy aquí para ayudarte a encontrar la mejor forma de trabajar según cómo te sientas y qué tengas que hacer.\n\n¿En qué puedo ayudarte hoy?"
+        # No enviar quick replies en el saludo inicial, dejar que el usuario responda naturalmente
+        return welcome, session, None
     
     # 3) Extracción de slots
     try:
@@ -402,46 +395,38 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if not new_slots.tiempo_bloque:
         missing.append("tiempo_bloque")
     
-    # Preguntar si faltan datos importantes y aún no hemos iterado mucho
+    # Preguntar si faltan datos importantes SOLO si falta información crítica
+    # Y SOLO en las primeras 2 iteraciones para no ser repetitivo
     if missing and session.iteration < 2:
         priority = ["tipo_tarea", "plazo", "fase", "tiempo_bloque"]
         want = next((k for k in priority if k in missing), None)
-        quick_replies = None
         
-        if want == "tipo_tarea":
-            q = "¿Qué tipo de trabajo tienes que hacer?"
-            quick_replies = [
-                {"label": "📝 Escribir algo", "value": "Tengo que escribir un trabajo"},
-                {"label": "📖 Leer/Estudiar", "value": "Tengo que leer y estudiar"},
-                {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
-                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"}
-            ]
-        elif want == "fase":
-            q = "¿En qué etapa estás?"
-            quick_replies = [
-                {"label": "💡 Recién empezando", "value": "Estoy en la fase de ideacion"},
-                {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
-                {"label": "✍️ Haciendo el trabajo", "value": "Estoy en la fase de ejecucion"},
-                {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
-            ]
-        elif want == "plazo":
-            q = "¿Para cuándo lo necesitas?"
-            quick_replies = [
-                {"label": "🔥 Hoy", "value": "Es para hoy"},
-                {"label": "⏰ Mañana", "value": "Es para mañana"},
-                {"label": "📅 Esta semana", "value": "Es para esta semana"},
-                {"label": "🗓️ Más adelante", "value": "Tengo más de una semana"}
-            ]
-        else:
-            q = "¿Cuánto tiempo tienes disponible ahora?"
-            quick_replies = [
-                {"label": "⚡ 10 min", "value": "Tengo 10 minutos"},
-                {"label": "🎯 15 min", "value": "Tengo 15 minutos"},
-                {"label": "💪 25 min", "value": "Tengo 25 minutos"},
-                {"label": "🔥 Más tiempo", "value": "Tengo más de 25 minutos"}
-            ]
+        # Solo preguntar si realmente necesitamos el dato para dar una estrategia
+        if want and want in ["tipo_tarea", "plazo"]:  # Datos más críticos
+            quick_replies = None
+            
+            if want == "tipo_tarea":
+                q = "¿Qué tipo de trabajo tienes que hacer?"
+                quick_replies = [
+                    {"label": "📝 Escribir algo", "value": "Tengo que escribir un trabajo"},
+                    {"label": "📖 Leer/Estudiar", "value": "Tengo que leer y estudiar"},
+                    {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
+                    {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"}
+                ]
+            elif want == "plazo":
+                q = "¿Para cuándo lo necesitas?"
+                quick_replies = [
+                    {"label": "🔥 Hoy", "value": "Es para hoy"},
+                    {"label": "⏰ Mañana", "value": "Es para mañana"},
+                    {"label": "📅 Esta semana", "value": "Es para esta semana"},
+                    {"label": "🗓️ Más adelante", "value": "Tengo más de una semana"}
+                ]
+            
+            # Solo retornar si tenemos quick_replies (pregunta crítica)
+            if quick_replies:
+                return q, session, quick_replies
         
-        return q, session, quick_replies
+        # Si falta fase o tiempo, no preguntar explícitamente, usar defaults y continuar
     
     # Defaults prudentes
     if not new_slots.tiempo_bloque:
@@ -593,32 +578,40 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
             full_message,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.8,
-                max_output_tokens=400,  # Aumentado para dar mejores explicaciones
+                max_output_tokens=400,
                 top_p=0.95
-            )
+            ),
+            safety_settings=[
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
         )
         
-        reply = response.text.strip()
+        # Manejo robusto de la respuesta
+        if response.candidates and len(response.candidates) > 0:
+            candidate = response.candidates[0]
+            if candidate.content and candidate.content.parts:
+                reply = candidate.content.parts[0].text.strip()
+            else:
+                # Si no hay contenido, usar fallback
+                logger.warning(f"Respuesta sin contenido. Finish reason: {candidate.finish_reason}")
+                reply = "Entiendo. Cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo tienes y para cuándo es?"
+        else:
+            reply = "Entiendo. Cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo tienes y para cuándo es?"
         
     except Exception as e:
         logger.error(f"Error generando respuesta conversacional: {e}")
         # Fallback simple y empático
-        reply = f"Entiendo, cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo es y para cuándo lo necesitas?"
+        reply = f"Entiendo. Cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo tienes y para cuándo es?"
     
     session.iteration += 1
     session.last_strategy = reply
     
-    # Si ya dio una estrategia (iteration >= 1), preguntar si funcionó
-    # La primera iteración es el saludo, desde la segunda ya da estrategias
-    if session.iteration >= 1:
-        quick_replies = [
-            {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
-            {"label": "😐 Sigo igual", "value": "sigo igual"},
-            {"label": "😟 Me siento peor", "value": "no funcionó"}
-        ]
-    else:
-        # Solo en el primer mensaje (saludo), dejar fluir la conversación
-        quick_replies = None
+    # NO enviar quick replies automáticamente - dejar que el usuario responda naturalmente
+    # Solo enviar quick replies cuando explicitamente preguntamos algo específico
+    quick_replies = None
     
     return reply, session, quick_replies
 
