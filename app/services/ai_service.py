@@ -98,7 +98,7 @@ RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 
 def detect_crisis(text: str) -> bool:
     """Detecta menciones de riesgo vital"""
-    crisis_regex = r'(suicid|quitarme la vida|no quiero vivir|hacerme daño|matarme)'
+    crisis_regex = r'(suicid|quitarme la vida|no quiero vivir|hacerme daño|matarme|desaparecer|terminar con todo|lastimarme)'
     return bool(re.search(crisis_regex, text, re.IGNORECASE))
 
 
@@ -107,13 +107,13 @@ def detect_crisis(text: str) -> bool:
 def guess_plazo(text: str) -> Optional[str]:
     """Extrae plazo del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'hoy|hoy día|ahora', text_lower):
+    if re.search(r'hoy|hoy día|ahora|en el día|para la noche', text_lower):
         return "hoy"
-    if re.search(r'mañana|24\s*h', text_lower):
+    if re.search(r'mañana|24\s*h|en un día', text_lower):
         return "<24h"
-    if re.search(r'próxima semana|la otra semana|esta semana', text_lower):
+    if re.search(r'próxima semana|la otra semana|esta semana|en estos días|antes del finde', text_lower):
         return "esta_semana"
-    if re.search(r'mes|semanas|>\s*1', text_lower):
+    if re.search(r'mes|semanas|>\s*1|próximo mes|largo plazo', text_lower):
         return ">1_semana"
     return None
 
@@ -121,41 +121,43 @@ def guess_plazo(text: str) -> Optional[str]:
 def guess_tipo_tarea(text: str) -> Optional[str]:
     """Extrae tipo de tarea del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'ensayo|essay', text_lower):
+    if re.search(r'ensayo|essay|informe|reporte|escrito', text_lower):
         return "ensayo"
-    if re.search(r'esquema|outline', text_lower):
+    if re.search(r'esquema|outline|mapa conceptual|diagrama', text_lower):
         return "esquema"
-    if re.search(r'borrador|draft', text_lower):
+    if re.search(r'borrador|draft|avance', text_lower):
         return "borrador"
-    if re.search(r'presentaci(ón|on)|slides', text_lower):
+    if re.search(r'presentaci(ón|on)|slides|powerpoint|discurso', text_lower):
         return "presentacion"
-    if re.search(r'proof|corregir|correcci(ón|on)|edita(r|ción)', text_lower):
+    if re.search(r'proof|corregir|correcci(ón|on)|edita(r|ción)|feedback', text_lower):
         return "proofreading"
-    if re.search(r'mcq|alternativa(s)?|test', text_lower):
+    if re.search(r'mcq|alternativa(s)?|test|prueba|examen', text_lower):
         return "mcq"
     if re.search(r'protocolo|laboratorio|lab', text_lower):
         return "protocolo_lab"
-    if re.search(r'problema(s)?|ejercicio(s)?|cálculo', text_lower):
+    if re.search(r'problema(s)?|ejercicio(s)?|cálculo|guía', text_lower):
         return "resolver_problemas"
-    if re.search(r'lectura|paper|art[ií]culo', text_lower):
+    if re.search(r'lectura|paper|art[ií]culo|leer|texto', text_lower):
         return "lectura_tecnica"
-    if re.search(r'resumen|sintetizar', text_lower):
+    if re.search(r'resumen|sintetizar|síntesis', text_lower):
         return "resumen"
-    if re.search(r'c(ó|o)digo|bug|programa', text_lower):
-        return "coding_bugfix"
+    if re.search(r'c(ó|o)digo|programar', text_lower) and not re.search(r'bug|error', text_lower):
+        return "coding"
+    if re.search(r'bug|error|debug', text_lower):
+        return "bugfix"
     return None
 
 
 def guess_fase(text: str) -> Optional[str]:
     """Extrae fase del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'ide(a|ación)|brainstorm', text_lower):
+    if re.search(r'ide(a|ación)|brainstorm|empezando|inicio', text_lower):
         return "ideacion"
-    if re.search(r'plan', text_lower):
+    if re.search(r'plan|organizar|estructura', text_lower):
         return "planificacion"
-    if re.search(r'escribir|redacci(ón|on)|hacer|resolver', text_lower):
+    if re.search(r'escribir|redacci(ón|on)|hacer|resolver|desarrollar|avanzando', text_lower):
         return "ejecucion"
-    if re.search(r'revis(ar|ión)|editar|proof', text_lower):
+    if re.search(r'revis(ar|ión)|editar|proof|corregir|finalizando|últimos detalles', text_lower):
         return "revision"
     return None
 
@@ -163,15 +165,15 @@ def guess_fase(text: str) -> Optional[str]:
 def guess_sentimiento(text: str) -> Optional[str]:
     """Extrae sentimiento del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'frustra', text_lower):
+    if re.search(r'frustra|enojado|molesto|rabia', text_lower):
         return "frustracion"
-    if re.search(r'ansiedad|miedo a equivocarme|nervios', text_lower):
+    if re.search(r'ansiedad|miedo a equivocarme|nervios|preocupado|estresado', text_lower):
         return "ansiedad_error"
-    if re.search(r'aburri', text_lower):
+    if re.search(r'aburri|lata|paja|sin ganas', text_lower):
         return "aburrimiento"
-    if re.search(r'dispers|rumi', text_lower):
+    if re.search(r'dispers|distraído|rumi|dando vueltas', text_lower):
         return "dispersion_rumiacion"
-    if re.search(r'autoeficacia baja|no puedo|no soy capaz', text_lower):
+    if re.search(r'autoeficacia baja|no puedo|no soy capaz|difícil|superado', text_lower):
         return "baja_autoeficacia"
     return None
 
@@ -196,7 +198,7 @@ async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
         sys_prompt = """Extrae como JSON compacto los campos del texto del usuario:
 - sentimiento: aburrimiento|frustracion|ansiedad_error|dispersion_rumiacion|baja_autoeficacia|otro
 - sentimiento_otro: texto libre si es "otro"
-- tipo_tarea: ensayo|esquema|borrador|lectura_tecnica|resumen|resolver_problemas|protocolo_lab|mcq|presentacion|coding_bugfix|proofreading
+- tipo_tarea: ensayo|esquema|borrador|lectura_tecnica|resumen|resolver_problemas|protocolo_lab|mcq|presentacion|coding|bugfix|proofreading
 - ramo: nombre del ramo/materia
 - plazo: hoy|<24h|esta_semana|>1_semana
 - fase: ideacion|planificacion|ejecucion|revision
@@ -263,9 +265,9 @@ def infer_q2_q3(slots: Slots) -> Tuple[str, str, str]:
     Infiere Q2 (A/B), Q3 (↑/↓/mixto) y enfoque (promocion/prevencion)
     """
     # Q2: Demanda creativa (A) vs analítica (B)
-    A_tasks = ["ensayo", "esquema", "borrador", "presentacion"]
+    A_tasks = ["ensayo", "esquema", "borrador", "presentacion", "coding"]
     B_tasks = ["proofreading", "mcq", "protocolo_lab", "resolver_problemas", 
-               "coding_bugfix", "lectura_tecnica", "resumen"]
+               "bugfix", "lectura_tecnica", "resumen"]
     
     Q2 = "A"
     if slots.tipo_tarea in B_tasks:
@@ -294,7 +296,7 @@ def infer_q2_q3(slots: Slots) -> Tuple[str, str, str]:
 
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
 
-async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "", chat_history: Optional[List] = None) -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
+async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "", chat_history: Optional[List[Dict[str, str]]] = None) -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
     """
     Orquestador principal del flujo metamotivacional.
     Retorna (respuesta_texto, session_actualizada, quick_replies)
@@ -305,17 +307,16 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         crisis_msg = "Escucho que estás en un momento muy difícil. Por favor, busca apoyo inmediato: **llama al 4141** (línea gratuita y confidencial del MINSAL). No estás sola/o."
         return crisis_msg, session, None
     
-    # 2) Saludo único
-    if not session.greeted:
+    # 2) Saludo único (si no hay historial y no se ha saludado)
+    if not chat_history and not session.greeted:
         session.greeted = True
-        welcome = "😊 ¿Cómo está tu motivación hoy?"
+        welcome = "¡Hola! Soy Flou, tu tutora de motivación. 😊 ¿Cómo estás hoy y qué tarea tienes en mente?"
         quick_replies = [
-            {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
-            {"label": "😤 Frustración", "value": "Siento frustración"},
-            {"label": "😰 Ansiedad", "value": "Siento ansiedad"},
-            {"label": "🌀 Dispersión", "value": "Siento dispersión"},
-            {"label": "😔 Baja motivación", "value": "Tengo baja motivación"},
-            {"label": "💭 Otro", "value": "Siento otra cosa"}
+            {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
+            {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
+            {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
+            {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
+            {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
         ]
         return welcome, session, quick_replies
     
@@ -504,11 +505,19 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         # Construir el historial de conversación para Gemini
         history = []
         if chat_history:
-            for msg in chat_history[:-1]:  # Excluir el último mensaje del usuario (ya lo pasaremos aparte)
-                history.append({
-                    "role": "user" if msg["role"] == "user" else "model",
-                    "parts": [msg["text"]]
-                })
+            for msg in chat_history:
+                role = "user" if msg.get("role") == "user" else "model"
+                # Asegurarnos de que el contenido es una lista de partes
+                parts = msg.get("parts", [])
+                if isinstance(parts, str):
+                    parts = [parts]
+                
+                # Si parts está vacío, intentamos obtenerlo de "text"
+                if not parts and "text" in msg:
+                    parts = [msg["text"]]
+
+                if parts:
+                    history.append({"role": role, "parts": parts})
         
         # Agregar contexto adicional si existe
         info_contexto = f"""
