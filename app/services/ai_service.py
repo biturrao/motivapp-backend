@@ -273,12 +273,20 @@ Slots actuales: {current_slots.model_dump_json()}
 
 JSON extraído:"""
 
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+        
         response = llm_model.generate_content(
             f"{sys_prompt}\n\n{user_prompt}",
             generation_config=genai.types.GenerationConfig(
                 temperature=0.2,
                 max_output_tokens=500
-            )
+            ),
+            safety_settings=safety_settings
         )
         
         raw = response.text.strip()
@@ -599,12 +607,17 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         crisis_msg = "Escucho que estás en un momento muy difícil. Por favor, busca apoyo inmediato: **llama al 4141** (línea gratuita y confidencial del MINSAL). No estás sola/o."
         return crisis_msg, session, None
     
-    # 2) Saludo único
+    # 2) Saludo inicial - DEBE IR ANTES DE CUALQUIER PROCESAMIENTO
+    user_text_lower = user_text.lower().strip()
     if not session.greeted:
         session.greeted = True
         welcome = f"Hola! 👋 Soy {AI_NAME}, tu asistente metamotivacional.\n\nEstoy aquí para ayudarte a encontrar la mejor forma de trabajar según cómo te sientas y qué tengas que hacer.\n\n¿En qué puedo ayudarte hoy?"
-        # No enviar quick replies en el saludo inicial, dejar que el usuario responda naturalmente
         return welcome, session, None
+    
+    # 2b) Detectar saludos simples después del saludo inicial (evitar procesamiento innecesario)
+    simple_greetings = ["hola", "holi", "hey", "hi", "buenas", "buenos días", "buenas tardes"]
+    if user_text_lower in simple_greetings:
+        return "Hola de nuevo 😊 ¿En qué puedo ayudarte hoy?", session, None
     
     # 3) Extracción de slots
     try:
@@ -677,7 +690,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
     # PRIMERO: Verificar si el usuario aceptó ir a bienestar (antes de otras detecciones)
-    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
+    if "quiero probar un ejercicio de bienestar" in user_text_lower or "DERIVAR_BIENESTAR" in user_text.upper():
         session.iteration = 0  # Reset para cuando vuelva
         session.last_eval_result = EvalResult(fallos_consecutivos=0)
         reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
@@ -702,7 +715,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         "bien", "muy bien", "genial", "excelente", "perfecto"
     ]
     
-    user_text_lower = user_text.lower().strip()
+    # user_text_lower ya fue declarado arriba, reutilizarlo
     
     # Verificar sin_mejora PRIMERO (tiene frases más específicas con "no")
     sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
