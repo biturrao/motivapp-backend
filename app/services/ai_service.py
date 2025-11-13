@@ -676,6 +676,45 @@ def _detect_fit_gap(slots: Slots) -> Optional[str]:
     return None
 
 
+    def _try_minimal_prompt(llm_model, user_text: str, slots: Slots, gen_config, safety_settings) -> Optional[str]:
+        """Último intento muy corto para evitar bloqueos por seguridad"""
+        try:
+            resumen_slots = f"Tarea: {slots.tipo_tarea or 'desconocida'} | Sentimiento: {slots.sentimiento or 'desconocido'} | Plazo: {slots.plazo or 'desconocido'} | Fase: {slots.fase or 'desconocida'}"
+            minimal_prompt = (
+                f"Actúa como {AI_NAME} y responde en español chileno con tono cálido. "
+                "Valida la emoción, da un micro-plan (<=3 pasos) y termina con una pregunta abierta.\n"
+                f"Contexto: {resumen_slots}.\nUsuario: {user_text}"
+            )
+            response = llm_model.generate_content(
+                minimal_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=gen_config.temperature,
+                    max_output_tokens=gen_config.max_output_tokens,
+                    top_p=gen_config.top_p
+                ),
+                safety_settings=safety_settings
+            )
+            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                return response.candidates[0].content.parts[0].text.strip()
+        except Exception as exc:
+            logger.error(f"Minimal prompt también falló: {exc}")
+        return None
+
+
+    def _refresh_repeated_response(new_reply: str, last_reply: Optional[str], user_text: str) -> str:
+        """Evita respuestas idénticas agregando reconocimiento del aporte del usuario"""
+        if not last_reply or not new_reply:
+            return new_reply
+        if new_reply.strip() != last_reply.strip():
+            return new_reply
+        detail = user_text.strip()
+        if not detail:
+            detail = "lo último que mencionaste"
+        elif len(detail) > 80:
+            detail = detail[:80].rstrip() + "..."
+        return f"Anotado lo que dices (“{detail}”). Mantengamos la micro-estrategia, pero avísame si quieres ajustarla:\n\n{new_reply}"
+
+
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
 
 async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "", chat_history: Optional[List] = None) -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
@@ -962,18 +1001,24 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
                     if candidate.content and candidate.content.parts:
                         reply = candidate.content.parts[0].text.strip()
                     else:
-                        # Si aún falla, usar fallback inteligente
-                        reply = _generate_fallback_response(new_slots, user_text)
+                        logger.warning(f"Segundo intento bloqueado. Finish reason: {candidate.finish_reason}. Lanzando prompt mínimo...")
+                        raise Exception("Blocked twice")
+                else:
+                    raise Exception("No candidates in response")
+            except Exception as inner_exc:
+                logger.info(f"Usando prompt mínimo debido a: {inner_exc}")
+                minimal_reply = _try_minimal_prompt(llm_model, user_text, new_slots, gen_config, safety_settings)
+                if minimal_reply:
+                    reply = minimal_reply
                 else:
                     reply = _generate_fallback_response(new_slots, user_text)
-            except:
-                reply = _generate_fallback_response(new_slots, user_text)
         
     except Exception as e:
         logger.error(f"Error generando respuesta conversacional: {e}")
         # Fallback simple y empático
         reply = f"Entiendo. Cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo tienes y para cuándo es?"
     
+    reply = _refresh_repeated_response(reply, session.last_strategy, user_text)
     session.iteration += 1
     session.last_strategy = reply
     
