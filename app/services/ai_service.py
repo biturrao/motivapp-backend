@@ -27,6 +27,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 AI_NAME = 'Flou'
 
 # Modelo por defecto (exportado para compatibilidad con wellness.py)
+# Usando gemini-2.0-flash-exp por ser rápido, económico y preciso para JSON
 model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 
@@ -107,13 +108,13 @@ def detect_crisis(text: str) -> bool:
 def guess_plazo(text: str) -> Optional[str]:
     """Extrae plazo del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'hoy|hoy día|ahora', text_lower):
+    if re.search(r'hoy|hoy día|ahora|urgente|inmediato|ya|al tiro', text_lower):
         return "hoy"
-    if re.search(r'mañana|24\s*h', text_lower):
+    if re.search(r'mañana|24\s*h|para mañ|en un día', text_lower):
         return "<24h"
-    if re.search(r'próxima semana|la otra semana|esta semana', text_lower):
+    if re.search(r'próxima semana|la otra semana|esta semana|en unos días|en pocos días|esta week', text_lower):
         return "esta_semana"
-    if re.search(r'mes|semanas|>\s*1', text_lower):
+    if re.search(r'mes|semanas|>\s*1|próximo mes|más adelante|largo plazo|tengo tiempo', text_lower):
         return ">1_semana"
     return None
 
@@ -121,27 +122,27 @@ def guess_plazo(text: str) -> Optional[str]:
 def guess_tipo_tarea(text: str) -> Optional[str]:
     """Extrae tipo de tarea del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'ensayo|essay', text_lower):
+    if re.search(r'ensayo|essay|redacción|escrito|composición', text_lower):
         return "ensayo"
-    if re.search(r'esquema|outline', text_lower):
+    if re.search(r'esquema|outline|estructura|mapa|diagrama', text_lower):
         return "esquema"
-    if re.search(r'borrador|draft', text_lower):
+    if re.search(r'borrador|draft|primer intento|versión inicial', text_lower):
         return "borrador"
-    if re.search(r'presentaci(ón|on)|slides', text_lower):
+    if re.search(r'presentaci(ón|on)|slides|ppt|powerpoint|exposición|presentar', text_lower):
         return "presentacion"
-    if re.search(r'proof|corregir|correcci(ón|on)|edita(r|ción)', text_lower):
+    if re.search(r'proof|corregir|correcci(ón|on)|edita(r|ción)|revisar|pulir|mejorar texto', text_lower):
         return "proofreading"
-    if re.search(r'mcq|alternativa(s)?|test', text_lower):
+    if re.search(r'mcq|alternativa(s)?|test|prueba|examen|quiz|cuestionario', text_lower):
         return "mcq"
-    if re.search(r'protocolo|laboratorio|lab', text_lower):
+    if re.search(r'protocolo|laboratorio|lab|experimento|práctica', text_lower):
         return "protocolo_lab"
-    if re.search(r'problema(s)?|ejercicio(s)?|cálculo', text_lower):
+    if re.search(r'problema(s)?|ejercicio(s)?|cálculo|matemática|tarea|guía|resolver', text_lower):
         return "resolver_problemas"
-    if re.search(r'lectura|paper|art[ií]culo', text_lower):
+    if re.search(r'lectura|paper|art[ií]culo|texto|libro|capítulo|leer|estudiar', text_lower):
         return "lectura_tecnica"
-    if re.search(r'resumen|sintetizar', text_lower):
+    if re.search(r'resumen|sintetizar|resumir|síntesis|extracto', text_lower):
         return "resumen"
-    if re.search(r'c(ó|o)digo|bug|programa', text_lower):
+    if re.search(r'c(ó|o)digo|bug|programa|programar|script|debugging|desarrollo', text_lower):
         return "coding_bugfix"
     return None
 
@@ -149,13 +150,13 @@ def guess_tipo_tarea(text: str) -> Optional[str]:
 def guess_fase(text: str) -> Optional[str]:
     """Extrae fase del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'ide(a|ación)|brainstorm', text_lower):
+    if re.search(r'ide(a|ación)|brainstorm|pensar|ocurrencia|inspiración|empezar|comenzar|inicio', text_lower):
         return "ideacion"
-    if re.search(r'plan', text_lower):
+    if re.search(r'plan|planear|organizar|estructurar|esquematizar|preparar', text_lower):
         return "planificacion"
-    if re.search(r'escribir|redacci(ón|on)|hacer|resolver', text_lower):
+    if re.search(r'escribir|redacci(ón|on)|hacer|resolver|ejecutar|desarrollar|trabajando|haciendo', text_lower):
         return "ejecucion"
-    if re.search(r'revis(ar|ión)|editar|proof', text_lower):
+    if re.search(r'revis(ar|ión)|editar|proof|corregir|verificar|chequear|pulir|terminar', text_lower):
         return "revision"
     return None
 
@@ -163,15 +164,15 @@ def guess_fase(text: str) -> Optional[str]:
 def guess_sentimiento(text: str) -> Optional[str]:
     """Extrae sentimiento del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'frustra', text_lower):
+    if re.search(r'frustra|enoja|irrita|molesta|rabia|bronca|impotente', text_lower):
         return "frustracion"
-    if re.search(r'ansiedad|miedo a equivocarme|nervios', text_lower):
+    if re.search(r'ansiedad|miedo a equivocarme|nervios|ansioso|estresado|agobiado|presionado|tenso', text_lower):
         return "ansiedad_error"
-    if re.search(r'aburri', text_lower):
+    if re.search(r'aburri|latero|flojo|sin ganas|desganado|monotono', text_lower):
         return "aburrimiento"
-    if re.search(r'dispers|rumi', text_lower):
+    if re.search(r'dispers|rumi|distraido|concentrar|pensando en otra|no enfoco', text_lower):
         return "dispersion_rumiacion"
-    if re.search(r'autoeficacia baja|no puedo|no soy capaz', text_lower):
+    if re.search(r'autoeficacia baja|no puedo|no soy capaz|incapaz|inseguro|dudo|no creo poder', text_lower):
         return "baja_autoeficacia"
     return None
 
@@ -188,7 +189,7 @@ def guess_ramo(text: str) -> Optional[str]:
 
 async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     """
-    Extrae slots estructurados del texto libre usando Gemini 2.5 Pro
+    Extrae slots estructurados del texto libre usando Gemini Flash
     """
     try:
         llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
@@ -372,10 +373,10 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         else:
             q = "¿Cuánto tiempo tienes disponible ahora?"
             quick_replies = [
-                {"label": "⚡ 10 min", "value": "10"},
-                {"label": "🎯 15 min", "value": "15"},
-                {"label": "💪 25 min", "value": "25"},
-                {"label": "🔥 Más tiempo", "value": "Tengo más tiempo"}
+                {"label": "⚡ 10 min", "value": "Tengo 10 minutos"},
+                {"label": "🎯 15 min", "value": "Tengo 15 minutos"},
+                {"label": "💪 25 min", "value": "Tengo 25 minutos"},
+                {"label": "🔥 Más tiempo", "value": "Tengo más de 25 minutos"}
             ]
         
         return q, session, quick_replies
@@ -497,7 +498,7 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
     # 7) Generar respuesta conversacional usando Gemini con historial
     try:
         llm_model = genai.GenerativeModel(
-            model_name='gemini-2.0-flash-exp',
+            model_name='gemini-2.5-pro',
             system_instruction=get_system_prompt()
         )
         
