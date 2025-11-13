@@ -108,72 +108,134 @@ def detect_crisis(text: str) -> bool:
 def guess_plazo(text: str) -> Optional[str]:
     """Extrae plazo del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'hoy|hoy día|ahora|urgente|inmediato|ya|al tiro', text_lower):
+    
+    # HOY (urgente, inmediato)
+    if re.search(r'\bhoy\b|hoy d(í|i)a|\bahora\b|\burgente\b|\binmediato\b|\bya\b|al tiro|en este momento|\bpronto\b|cuanto antes', text_lower):
         return "hoy"
-    if re.search(r'mañana|24\s*h|para mañ|en un día', text_lower):
+    
+    # MENOS DE 24H (mañana)
+    if re.search(r'\bma(ñ|n)ana\b|24\s*h(oras)?|para ma(ñ|n)|en un d(í|i)a|pasado ma(ñ|n)ana', text_lower):
         return "<24h"
-    if re.search(r'próxima semana|la otra semana|esta semana|en unos días|en pocos días|esta week', text_lower):
+    
+    # ESTA SEMANA (días cercanos)
+    if re.search(r'pr(ó|o)xima semana|la otra semana|esta semana|en unos d(í|i)as|en pocos d(í|i)as|esta week|fin de semana|para el (lunes|martes|miércoles|jueves|viernes)', text_lower):
         return "esta_semana"
-    if re.search(r'mes|semanas|>\s*1|próximo mes|más adelante|largo plazo|tengo tiempo', text_lower):
+    
+    # MÁS DE 1 SEMANA (largo plazo)
+    if re.search(r'\bmes\b|semanas|pr(ó|o)ximo mes|m(á|a)s adelante|largo plazo|tengo tiempo|no es urgente|con calma|para el otro mes', text_lower):
         return ">1_semana"
+    
     return None
 
 
 def guess_tipo_tarea(text: str) -> Optional[str]:
-    """Extrae tipo de tarea del texto usando heurística"""
+    """Extrae tipo de tarea del texto usando heurística - PRUDENTE: solo clasifica cuando hay evidencia clara"""
     text_lower = text.lower()
-    if re.search(r'ensayo|essay|redacción|escrito|composición', text_lower):
-        return "ensayo"
-    if re.search(r'esquema|outline|estructura|mapa|diagrama', text_lower):
-        return "esquema"
-    if re.search(r'borrador|draft|primer intento|versión inicial', text_lower):
-        return "borrador"
-    if re.search(r'presentaci(ón|on)|slides|ppt|powerpoint|exposición|presentar', text_lower):
-        return "presentacion"
-    if re.search(r'proof|corregir|correcci(ón|on)|edita(r|ción)|revisar|pulir|mejorar texto', text_lower):
-        return "proofreading"
-    if re.search(r'mcq|alternativa(s)?|test|prueba|examen|quiz|cuestionario', text_lower):
-        return "mcq"
-    if re.search(r'protocolo|laboratorio|lab|experimento|práctica', text_lower):
-        return "protocolo_lab"
-    if re.search(r'problema(s)?|ejercicio(s)?|cálculo|matemática|tarea|guía|resolver', text_lower):
-        return "resolver_problemas"
-    if re.search(r'lectura|paper|art[ií]culo|texto|libro|capítulo|leer|estudiar', text_lower):
-        return "lectura_tecnica"
-    if re.search(r'resumen|sintetizar|resumir|síntesis|extracto', text_lower):
-        return "resumen"
-    if re.search(r'c(ó|o)digo|bug|programa|programar|script|debugging|desarrollo', text_lower):
+    
+    # ORDEN IMPORTANTE: De más específico a más general
+    
+    # 1. Debugging/bugfix (MUY ESPECÍFICO - requiere mención explícita de bug/error)
+    if re.search(r'\bbug\b|\berror\b|debug|arreglar.*c(ó|o)digo|corregir.*c(ó|o)digo|\bfix\b.*code', text_lower):
         return "coding_bugfix"
+    
+    # 2. Revisión/corrección de texto (antes de ensayo)
+    if re.search(r'\bcorregir\b|\brevis(ar|ión)\b.*\b(texto|ensayo|escrito|trabajo)|proof|edita(r|ción)|pulir|mejorar\s+(el|mi)\s+(texto|ensayo)', text_lower):
+        return "proofreading"
+    
+    # 3. Ensayo (escritura creativa/argumentativa)
+    if re.search(r'\bensayo\b|\bessay\b|redacci(ón|on)\s+de|escribir\s+(un|una)\s+(ensayo|essay|composición|trabajo\s+escrito)|composici(ó|on)\s+argumentativa', text_lower):
+        return "ensayo"
+    
+    # 4. Borrador (versión preliminar)
+    if re.search(r'\bborrador\b|\bdraft\b|primera?\s+(versi(ó|o)n|intento)|versi(ó|o)n\s+(inicial|preliminar)', text_lower):
+        return "borrador"
+    
+    # 5. Esquema/estructura (antes de empezar a escribir)
+    if re.search(r'\besquema\b|\boutline\b|estructura\s+(de|del|para)|mapa\s+(conceptual|mental)|diagrama\s+de', text_lower):
+        return "esquema"
+    
+    # 6. Presentación (slides, exposición)
+    if re.search(r'presentaci(ó|o)n|\bslides?\b|\bppt\b|powerpoint|exposici(ó|o)n|\bdisertaci(ó|o)n\b|preparar.*presentar', text_lower):
+        return "presentacion"
+    
+    # 7. Examen/Test (pruebas con alternativas)
+    if re.search(r'\bmcq\b|alternativas?|\btest\b|\bprueba\b|\bexamen\b|\bquiz\b|cuestionario|evaluaci(ó|o)n.*alternativas', text_lower):
+        return "mcq"
+    
+    # 8. Protocolo de laboratorio
+    if re.search(r'protocolo\s+(de\s+)?lab|laboratorio|experimento|pr(á|a)ctica\s+(de\s+)?lab|informe\s+de\s+lab', text_lower):
+        return "protocolo_lab"
+    
+    # 9. Resolver problemas/ejercicios (matemática, física, etc.)
+    if re.search(r'\bproblemas?\b.*resolver|\bejercicios?\b|c(á|a)lculo|matem(á|a)tica|\bgu(í|i)a\b.*ejercicios|resolver.*(gu(í|i)a|tarea|problemas)|problemas?.*de', text_lower):
+        return "resolver_problemas"
+    
+    # 10. Lectura técnica/académica
+    if re.search(r'\bleer\b.*(paper|art(í|i)culo|texto|cap(í|i)tulo)|\bpaper\b|art(í|i)culo.*cient(í|i)fico|lectura.*t(é|e)cnica|estudiar.*(texto|libro|cap(í|i)tulo)', text_lower):
+        return "lectura_tecnica"
+    
+    # 11. Resumen/síntesis
+    if re.search(r'\bresumen\b|sintetizar|resumir|s(í|i)ntesis\s+de|extracto|hacer.*resumen', text_lower):
+        return "resumen"
+    
+    # 12. Programación/desarrollo (GENÉRICO - solo si menciona programar pero NO bug)
+    # Este va al FINAL porque es muy general
+    if re.search(r'\bprogramar\b|\bc(ó|o)digo\b|\bscript\b|desarrollo.*software|implementar.*c(ó|o)digo|crear.*(programa|aplicaci(ó|o)n)', text_lower):
+        # Verificar que NO sea bug (ya lo detectamos arriba)
+        if not re.search(r'\bbug\b|\berror\b|debug|arreglar|corregir.*c(ó|o)digo', text_lower):
+            return "coding_bugfix"  # Usamos el mismo tipo pero con intención de desarrollo
+    
+    # Si no hay coincidencia clara, retornar None (mejor que adivinar)
     return None
 
 
 def guess_fase(text: str) -> Optional[str]:
     """Extrae fase del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'ide(a|ación)|brainstorm|pensar|ocurrencia|inspiración|empezar|comenzar|inicio', text_lower):
+    
+    # IDEACIÓN (generación de ideas, brainstorming)
+    if re.search(r'\bide(a|ación)\b|\bbrainstorm|\bpensar\b.*ideas|ocurrencia|inspiraci(ó|o)n|empezar.*idea|comenzar.*idea|\binicio\b|pensando.*tema|buscar.*tema|no s(é|e).*qu(é|e).*escribir', text_lower):
         return "ideacion"
-    if re.search(r'plan|planear|organizar|estructurar|esquematizar|preparar', text_lower):
+    
+    # PLANIFICACIÓN (organizar, estructurar antes de ejecutar)
+    if re.search(r'\bplan(ear)?\b|\borganizar\b|\bestructurar\b|esquematizar|\bpreparar\b|definir.*estructura|hacer.*esquema|armar.*(plan|estructura)|antes de empezar', text_lower):
         return "planificacion"
-    if re.search(r'escribir|redacci(ón|on)|hacer|resolver|ejecutar|desarrollar|trabajando|haciendo', text_lower):
+    
+    # EJECUCIÓN (haciendo el trabajo, en pleno proceso)
+    if re.search(r'\bescribir\b|\bescribiendo\b|redacci(ó|o)n|\bhacer\b|\bhaciendo\b|\bresolver\b|\bresolviendo\b|\bejecutar\b|desarrollar|\btrabajando\b|en proceso|a mitad|avanzando', text_lower):
         return "ejecucion"
-    if re.search(r'revis(ar|ión)|editar|proof|corregir|verificar|chequear|pulir|terminar', text_lower):
+    
+    # REVISIÓN (corregir, editar, terminar detalles)
+    if re.search(r'\brevis(ar|ión)\b|\beditar\b|\bproof\b|\bcorregir\b|verificar|chequear|\bpulir\b|\bterminar\b.*detalles|ya.*casi|falta poco|\bfinal(es|izar)?\b|última.*revisi(ó|o)n', text_lower):
         return "revision"
+    
     return None
 
 
 def guess_sentimiento(text: str) -> Optional[str]:
     """Extrae sentimiento del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'frustra|enoja|irrita|molesta|rabia|bronca|impotente', text_lower):
+    
+    # FRUSTRACIÓN (enojo, rabia, impotencia)
+    if re.search(r'\bfrustra(do|da|ción)?\b|\benoja(do|da)?\b|\birrita(do|da)?\b|\bmolesta(do|da)?\b|\brabia\b|\bbronca\b|\bimpotente\b|\bharto\b|\bcansa(do|da)\b.*intentar|no.*sale|no.*funciona.*nada', text_lower):
         return "frustracion"
-    if re.search(r'ansiedad|miedo a equivocarme|nervios|ansioso|estresado|agobiado|presionado|tenso', text_lower):
+    
+    # ANSIEDAD/MIEDO A ERROR (nervioso, estresado, presión)
+    if re.search(r'\bansiedad\b|\bansioso\b|\bansiosa\b|miedo.*equivocar|\bnervios\b|\bnervioso\b|\bnerviosa\b|\bestresa(do|da)\b|\bagobia(do|da)\b|\bpresiona(do|da)\b|\btenso\b|\btensa\b|\bp(á|a)nico\b|\bpreocupa(do|da)\b|miedo.*fallar|miedo.*mal', text_lower):
         return "ansiedad_error"
-    if re.search(r'aburri|latero|flojo|sin ganas|desganado|monotono', text_lower):
+    
+    # ABURRIMIENTO (latero, sin ganas, desganado)
+    if re.search(r'\baburri(do|da|miento)?\b|\blatero\b|\blatera\b|\bflojo\b|\bfloja\b|sin ganas|\bdesgana(do|da)\b|\bmon(ó|o)tono\b|poco.*motivado|\bdesmotiva(do|da)\b|no.*interesa|\bpaja\b.*hacer', text_lower):
         return "aburrimiento"
-    if re.search(r'dispers|rumi|distraido|concentrar|pensando en otra|no enfoco', text_lower):
+    
+    # DISPERSIÓN/RUMIACIÓN (distraído, no puedo concentrarme)
+    if re.search(r'\bdispers(o|a|ión)?\b|\brumi(a|ación)?\b|\bdistra(í|i)(do|da)\b|no.*concentr(o|ar)|pensando en otra|no.*enfoco|\bmente.*vuela\b|\bdesconcentra(do|da)\b|mil.*cosas.*cabeza|no.*paro.*pensar', text_lower):
         return "dispersion_rumiacion"
-    if re.search(r'autoeficacia baja|no puedo|no soy capaz|incapaz|inseguro|dudo|no creo poder', text_lower):
+    
+    # BAJA AUTOEFICACIA (no puedo, no soy capaz, inseguro)
+    if re.search(r'autoeficacia baja|\bno puedo\b|no soy capaz|\bincapaz\b|\binseguro\b|\binsegura\b|\bdudo\b|no creo poder|no.*voy.*lograr|no.*soy.*bueno|\bmal(o|a)\b.*esto|no.*sirvo', text_lower):
         return "baja_autoeficacia"
+    
     return None
 
 
