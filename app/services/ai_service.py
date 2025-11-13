@@ -27,7 +27,6 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 AI_NAME = 'Flou'
 
 # Modelo por defecto (exportado para compatibilidad con wellness.py)
-# Usando gemini-2.0-flash-exp por ser rápido, económico y preciso para JSON
 model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 
@@ -40,7 +39,7 @@ Eres {AI_NAME}, una tutora de motivación que ayuda a estudiantes universitarios
 
 TU PERSONALIDAD:
 - Hablas de forma cercana y amigable, como una compañera mayor
-- Eres empática y validas las emociones antes de dar consejos
+- Eres empática y validates las emociones antes de dar consejos
 - Explicas todo con lenguaje simple y cotidiano
 - NO uses términos académicos complicados ni símbolos extraños (evita: ↑↓·→)
 - Usa emojis ocasionales para dar calidez 😊
@@ -108,134 +107,72 @@ def detect_crisis(text: str) -> bool:
 def guess_plazo(text: str) -> Optional[str]:
     """Extrae plazo del texto usando heurística"""
     text_lower = text.lower()
-    
-    # HOY (urgente, inmediato)
-    if re.search(r'\bhoy\b|hoy d(í|i)a|\bahora\b|\burgente\b|\binmediato\b|\bya\b|al tiro|en este momento|\bpronto\b|cuanto antes', text_lower):
+    if re.search(r'hoy|hoy día|ahora', text_lower):
         return "hoy"
-    
-    # MENOS DE 24H (mañana)
-    if re.search(r'\bma(ñ|n)ana\b|24\s*h(oras)?|para ma(ñ|n)|en un d(í|i)a|pasado ma(ñ|n)ana', text_lower):
+    if re.search(r'mañana|24\s*h', text_lower):
         return "<24h"
-    
-    # ESTA SEMANA (días cercanos)
-    if re.search(r'pr(ó|o)xima semana|la otra semana|esta semana|en unos d(í|i)as|en pocos d(í|i)as|esta week|fin de semana|para el (lunes|martes|miércoles|jueves|viernes)', text_lower):
+    if re.search(r'próxima semana|la otra semana|esta semana', text_lower):
         return "esta_semana"
-    
-    # MÁS DE 1 SEMANA (largo plazo)
-    if re.search(r'\bmes\b|semanas|pr(ó|o)ximo mes|m(á|a)s adelante|largo plazo|tengo tiempo|no es urgente|con calma|para el otro mes', text_lower):
+    if re.search(r'mes|semanas|>\s*1', text_lower):
         return ">1_semana"
-    
     return None
 
 
 def guess_tipo_tarea(text: str) -> Optional[str]:
-    """Extrae tipo de tarea del texto usando heurística - PRUDENTE: solo clasifica cuando hay evidencia clara"""
+    """Extrae tipo de tarea del texto usando heurística"""
     text_lower = text.lower()
-    
-    # ORDEN IMPORTANTE: De más específico a más general
-    
-    # 1. Debugging/bugfix (MUY ESPECÍFICO - requiere mención explícita de bug/error)
-    if re.search(r'\bbug\b|\berror\b|debug|arreglar.*c(ó|o)digo|corregir.*c(ó|o)digo|\bfix\b.*code', text_lower):
-        return "coding_bugfix"
-    
-    # 2. Revisión/corrección de texto (antes de ensayo)
-    if re.search(r'\bcorregir\b|\brevis(ar|ión)\b.*\b(texto|ensayo|escrito|trabajo)|proof|edita(r|ción)|pulir|mejorar\s+(el|mi)\s+(texto|ensayo)', text_lower):
-        return "proofreading"
-    
-    # 3. Ensayo (escritura creativa/argumentativa)
-    if re.search(r'\bensayo\b|\bessay\b|redacci(ón|on)\s+de|escribir\s+(un|una)\s+(ensayo|essay|composición|trabajo\s+escrito)|composici(ó|on)\s+argumentativa', text_lower):
+    if re.search(r'ensayo|essay', text_lower):
         return "ensayo"
-    
-    # 4. Borrador (versión preliminar)
-    if re.search(r'\bborrador\b|\bdraft\b|primera?\s+(versi(ó|o)n|intento)|versi(ó|o)n\s+(inicial|preliminar)', text_lower):
-        return "borrador"
-    
-    # 5. Esquema/estructura (antes de empezar a escribir)
-    if re.search(r'\besquema\b|\boutline\b|estructura\s+(de|del|para)|mapa\s+(conceptual|mental)|diagrama\s+de', text_lower):
+    if re.search(r'esquema|outline', text_lower):
         return "esquema"
-    
-    # 6. Presentación (slides, exposición)
-    if re.search(r'presentaci(ó|o)n|\bslides?\b|\bppt\b|powerpoint|exposici(ó|o)n|\bdisertaci(ó|o)n\b|preparar.*presentar', text_lower):
+    if re.search(r'borrador|draft', text_lower):
+        return "borrador"
+    if re.search(r'presentaci(ón|on)|slides', text_lower):
         return "presentacion"
-    
-    # 7. Examen/Test (pruebas con alternativas)
-    if re.search(r'\bmcq\b|alternativas?|\btest\b|\bprueba\b|\bexamen\b|\bquiz\b|cuestionario|evaluaci(ó|o)n.*alternativas', text_lower):
+    if re.search(r'proof|corregir|correcci(ón|on)|edita(r|ción)', text_lower):
+        return "proofreading"
+    if re.search(r'mcq|alternativa(s)?|test', text_lower):
         return "mcq"
-    
-    # 8. Protocolo de laboratorio
-    if re.search(r'protocolo\s+(de\s+)?lab|laboratorio|experimento|pr(á|a)ctica\s+(de\s+)?lab|informe\s+de\s+lab', text_lower):
+    if re.search(r'protocolo|laboratorio|lab', text_lower):
         return "protocolo_lab"
-    
-    # 9. Resolver problemas/ejercicios (matemática, física, etc.)
-    if re.search(r'\bproblemas?\b.*resolver|\bejercicios?\b|c(á|a)lculo|matem(á|a)tica|\bgu(í|i)a\b.*ejercicios|resolver.*(gu(í|i)a|tarea|problemas)|problemas?.*de', text_lower):
+    if re.search(r'problema(s)?|ejercicio(s)?|cálculo', text_lower):
         return "resolver_problemas"
-    
-    # 10. Lectura técnica/académica
-    if re.search(r'\bleer\b.*(paper|art(í|i)culo|texto|cap(í|i)tulo)|\bpaper\b|art(í|i)culo.*cient(í|i)fico|lectura.*t(é|e)cnica|estudiar.*(texto|libro|cap(í|i)tulo)', text_lower):
+    if re.search(r'lectura|paper|art[ií]culo', text_lower):
         return "lectura_tecnica"
-    
-    # 11. Resumen/síntesis
-    if re.search(r'\bresumen\b|sintetizar|resumir|s(í|i)ntesis\s+de|extracto|hacer.*resumen', text_lower):
+    if re.search(r'resumen|sintetizar', text_lower):
         return "resumen"
-    
-    # 12. Programación/desarrollo (GENÉRICO - solo si menciona programar pero NO bug)
-    # Este va al FINAL porque es muy general
-    if re.search(r'\bprogramar\b|\bc(ó|o)digo\b|\bscript\b|desarrollo.*software|implementar.*c(ó|o)digo|crear.*(programa|aplicaci(ó|o)n)', text_lower):
-        # Verificar que NO sea bug (ya lo detectamos arriba)
-        if not re.search(r'\bbug\b|\berror\b|debug|arreglar|corregir.*c(ó|o)digo', text_lower):
-            return "coding_bugfix"  # Usar mismo tipo para programación general
-    
-    # Si no hay coincidencia clara, retornar None (mejor que adivinar)
+    if re.search(r'c(ó|o)digo|bug|programa', text_lower):
+        return "coding_bugfix"
     return None
 
 
 def guess_fase(text: str) -> Optional[str]:
     """Extrae fase del texto usando heurística"""
     text_lower = text.lower()
-    
-    # IDEACIÓN (generación de ideas, brainstorming)
-    if re.search(r'\bide(a|ación)\b|\bbrainstorm|\bpensar\b.*ideas|ocurrencia|inspiraci(ó|o)n|empezar.*idea|comenzar.*idea|\binicio\b|pensando.*tema|buscar.*tema|no s(é|e).*qu(é|e).*escribir', text_lower):
+    if re.search(r'ide(a|ación)|brainstorm', text_lower):
         return "ideacion"
-    
-    # PLANIFICACIÓN (organizar, estructurar antes de ejecutar)
-    if re.search(r'\bplan(ear)?\b|\borganizar\b|\bestructurar\b|esquematizar|\bpreparar\b|definir.*estructura|hacer.*esquema|armar.*(plan|estructura)|antes de empezar', text_lower):
+    if re.search(r'plan', text_lower):
         return "planificacion"
-    
-    # EJECUCIÓN (haciendo el trabajo, en pleno proceso)
-    if re.search(r'\bescribir\b|\bescribiendo\b|redacci(ó|o)n|\bhacer\b|\bhaciendo\b|\bresolver\b|\bresolviendo\b|\bejecutar\b|desarrollar|\btrabajando\b|en proceso|a mitad|avanzando', text_lower):
+    if re.search(r'escribir|redacci(ón|on)|hacer|resolver', text_lower):
         return "ejecucion"
-    
-    # REVISIÓN (corregir, editar, terminar detalles)
-    if re.search(r'\brevis(ar|ión)\b|\beditar\b|\bproof\b|\bcorregir\b|verificar|chequear|\bpulir\b|\bterminar\b.*detalles|ya.*casi|falta poco|\bfinal(es|izar)?\b|última.*revisi(ó|o)n', text_lower):
+    if re.search(r'revis(ar|ión)|editar|proof', text_lower):
         return "revision"
-    
     return None
 
 
 def guess_sentimiento(text: str) -> Optional[str]:
     """Extrae sentimiento del texto usando heurística"""
     text_lower = text.lower()
-    
-    # FRUSTRACIÓN (enojo, rabia, impotencia)
-    if re.search(r'\bfrustra(do|da|ción)?\b|\benoja(do|da)?\b|\birrita(do|da)?\b|\bmolesta(do|da)?\b|\brabia\b|\bbronca\b|\bimpotente\b|\bharto\b|\bcansa(do|da)\b.*intentar|no.*sale|no.*funciona.*nada', text_lower):
+    if re.search(r'frustra', text_lower):
         return "frustracion"
-    
-    # ANSIEDAD/MIEDO A ERROR (nervioso, estresado, presión)
-    if re.search(r'\bansiedad\b|\bansioso\b|\bansiosa\b|miedo.*equivocar|\bnervios\b|\bnervioso\b|\bnerviosa\b|\bestresa(do|da)\b|\bagobia(do|da)\b|\bpresiona(do|da)\b|\btenso\b|\btensa\b|\bp(á|a)nico\b|\bpreocupa(do|da)\b|miedo.*fallar|miedo.*mal', text_lower):
+    if re.search(r'ansiedad|miedo a equivocarme|nervios', text_lower):
         return "ansiedad_error"
-    
-    # ABURRIMIENTO (latero, sin ganas, desganado)
-    if re.search(r'\baburri(do|da|miento)?\b|\blatero\b|\blatera\b|\bflojo\b|\bfloja\b|sin ganas|\bdesgana(do|da)\b|\bmon(ó|o)tono\b|poco.*motivado|\bdesmotiva(do|da)\b|no.*interesa|\bpaja\b.*hacer', text_lower):
+    if re.search(r'aburri', text_lower):
         return "aburrimiento"
-    
-    # DISPERSIÓN/RUMIACIÓN (distraído, no puedo concentrarme)
-    if re.search(r'\bdispers(o|a|ión)?\b|\brumi(a|ación)?\b|\bdistra(í|i)(do|da)\b|no.*concentr(o|ar)|pensando en otra|no.*enfoco|\bmente.*vuela\b|\bdesconcentra(do|da)\b|mil.*cosas.*cabeza|no.*paro.*pensar', text_lower):
+    if re.search(r'dispers|rumi', text_lower):
         return "dispersion_rumiacion"
-    
-    # BAJA AUTOEFICACIA (no puedo, no soy capaz, inseguro)
-    if re.search(r'autoeficacia baja|\bno puedo\b|no soy capaz|\bincapaz\b|\binseguro\b|\binsegura\b|\bdudo\b|no creo poder|no.*voy.*lograr|no.*soy.*bueno|\bmal(o|a)\b.*esto|no.*sirvo', text_lower):
+    if re.search(r'autoeficacia baja|no puedo|no soy capaz', text_lower):
         return "baja_autoeficacia"
-    
     return None
 
 
@@ -251,7 +188,7 @@ def guess_ramo(text: str) -> Optional[str]:
 
 async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     """
-    Extrae slots estructurados del texto libre usando Gemini Flash
+    Extrae slots estructurados del texto libre usando Gemini 2.5 Pro
     """
     try:
         llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
@@ -273,20 +210,12 @@ Slots actuales: {current_slots.model_dump_json()}
 
 JSON extraído:"""
 
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        
         response = llm_model.generate_content(
             f"{sys_prompt}\n\n{user_prompt}",
             generation_config=genai.types.GenerationConfig(
                 temperature=0.2,
                 max_output_tokens=500
-            ),
-            safety_settings=safety_settings
+            )
         )
         
         raw = response.text.strip()
@@ -363,339 +292,6 @@ def infer_q2_q3(slots: Slots) -> Tuple[str, str, str]:
     return Q2, Q3, enfoque
 
 
-# ---------------------------- FALLBACK INTELIGENTE (NLU ROBUSTO) ---------------------------- #
-
-def _detect_intent(user_text: str) -> str:
-    """Detecta la intención del usuario con múltiples patrones (estilo NLU municipal)"""
-    text_lower = user_text.lower()
-    
-    # Intención: Saludo
-    if re.search(r'\b(hola|holi|buenas|buenos días|buenas tardes|hey|hi)\b', text_lower):
-        return "saludo"
-    
-    # Intención: Celebrar logro / cierre positivo
-    if re.search(r'(termin[ée]|lo logr[ée]|listo|ya acab[ée]|me result[óo]|qued[óo] bien)', text_lower):
-        return "celebrar_logro"
-    
-    # Intención: Baja energía física o mental
-    if re.search(r'(sin energ[íi]a|sin pilas|cansad[oa]|agotad[oa]|no tengo fuerzas|no me da el cuerpo|estoy molid[oa])', text_lower):
-        return "baja_energia"
-    
-    # Intención: Necesita pausa breve
-    if re.search(r'(necesito (una )?pausa|quiero descansar|dame un respiro|break|respiro corto|descansar un rato)', text_lower):
-        return "necesito_pausa"
-    
-    # Intención: Cambio explícito de estrategia
-    if re.search(r'(otra estrategia|cambiemos de plan|algo distinto|no me sirve lo anterior|dame otra idea|reencuadra|reencuadre)', text_lower):
-        return "cambio_estrategia"
-    
-    # Intención: Derivar a bienestar/ejercicios regulatorios
-    if re.search(r'(bienestar|mindfulness|respiraci[óo]n guiada|ejercicio de respiraci[óo]n|meditaci[óo]n corta|relajarme un poco)', text_lower):
-        return "derivar_bienestar"
-    
-    # Intención: Solicitud de ayuda
-    if re.search(r'\b(ayuda|ayúdame|necesito|auxilio|socorro)\b', text_lower):
-        return "solicitud_ayuda"
-    
-    # Intención: Describiendo problema/tarea
-    if re.search(r'\b(tengo que|debo|tarea|trabajo|proyecto|actividad|pendiente)\b', text_lower):
-        return "describir_tarea"
-    
-    # Intención: Confusión / no saber cómo avanzar
-    if re.search(r'(no s[ée] (c[óo]mo|por d[óo]nde)|estoy perdid[oa]|no entiendo nada|no me resulta ninguna estrategia)', text_lower):
-        return "confusion"
-    
-    # Intención: Expresando emoción
-    if re.search(r'\b(siento|me siento|estoy|ando|estoy pasando)\b.*(mal|bien|triste|feliz|ansioso|estresado|frustrado|aburrido)', text_lower):
-        return "expresar_emocion"
-    
-    # Intención: Preguntando cómo usar el servicio
-    if re.search(r'\b(cómo|como).*(funciona|usar|utilizar|trabaja|ayuda)\b', text_lower):
-        return "consulta_servicio"
-    
-    # Intención: Agradecimiento
-    if re.search(r'\b(gracias|muchas gracias|te agradezco|thanks)\b', text_lower):
-        return "agradecimiento"
-    
-    return "general"
-
-
-def _generate_fallback_response(slots: Slots, user_text: str) -> str:
-    """
-    Sistema de fallback robusto tipo NLU municipal con estrategias metamotivacionales
-    Basado en Miele & Scholer (2016): Task-Motivation Fit
-    Garantiza SIEMPRE una respuesta útil usando cascada de estrategias
-    """
-    
-    # Nivel 1: Detectar intención y responder según ella
-    intent = _detect_intent(user_text)
-    
-    if intent == "saludo":
-        return f"¡Hola! 😊 Soy {AI_NAME}, tu asistente metamotivacional. Estoy aquí para ayudarte con tus tareas y encontrar la mejor forma de trabajar. ¿Qué necesitas hacer hoy?"
-    
-    elif intent == "celebrar_logro":
-        return "¡Qué seco! 🙌 Me alegra que hayas avanzado. Si quieres, cuéntame cómo te sientes ahora o qué tarea sigue y ajustamos otra estrategia." 
-    
-    elif intent == "agradecimiento":
-        return "¡De nada! 😊 Me alegra poder ayudarte. Si necesitas más apoyo o una nueva estrategia, aquí estoy. ¿Hay algo más en lo que pueda ayudarte?"
-    
-    elif intent == "consulta_servicio":
-        return f"Soy {AI_NAME}, tu asistente de motivación. Te ayudo a encontrar la mejor forma de trabajar según cómo te sientas y qué tengas que hacer. Solo cuéntame qué tarea tienes pendiente y cómo te sientes, y yo te daré una estrategia concreta. ¿Qué necesitas hacer?"
-    
-    elif intent == "solicitud_ayuda":
-        return "Aquí estoy. Para darte una estrategia precisa necesito dos cosas: qué tarea tienes pendiente y cómo anda tu motivación (ansioso, aburrido, frustrado, etc.). Cuéntame eso y armamos un plan pequeño." 
-    
-    elif intent == "describir_tarea":
-        if not slots.sentimiento:
-            return "Perfecto, ya sé qué tienes que hacer. Ahora dime cómo te sientes con esa tarea para decidir si vamos por un enfoque de promoción (ideas nuevas) o de prevención (cerrar pendientes)."
-        if not slots.plazo:
-            return "Entendido el tipo de tarea. ¿Para cuándo la necesitas? Según el plazo defino si conviene una estrategia corta o algo más exploratorio."
-        # Si ya tenemos emoción y plazo, seguir flujo normal
-    
-    elif intent == "baja_energia":
-        return "Si la energía está al piso, primero necesitamos micro-recarga. Haz un break muy concreto: levántate, toma agua y haz 5 respiraciones profundas enfocándote en alargar la exhalación. Eso activa el modo recuperación y después retomamos con un bloque de 10 minutos. ¿Te resulta?"
-    
-    elif intent == "necesito_pausa":
-        return "Vale, escucho que tu mente pide una pausa. Las teorías de metamotivación dicen que cambiar brevemente a modo restaurativo evita el desgaste. Haz 3 minutos de respiración cuadrada (inhala 4s, mantén 4, exhala 4, mantén 4) y vuelve para contarme cómo te sientes."
-    
-    elif intent == "cambio_estrategia":
-        return 'Probemos un reencuadre. Cuando una táctica no engancha, cambiamos el nivel de abstracción: si estabas pensando en el "por qué", bajemos al "cómo" con un micro-paso verificable (ej: solo abre el doc y escribe el título). ¿Quieres que te proponga uno nuevo según tu tarea?'
-    
-    elif intent == "derivar_bienestar":
-        return 'Puedo guiarte a la sección de Bienestar cuando quieras. Solo dime "Quiero probar un ejercicio de bienestar" y te mando directo a los ejercicios de respiración, grounding y mindfulness para resetear.'
-    
-    elif intent == "confusion":
-        return 'Ok, cuando todo se siente nebuloso aplicamos el principio de "elige un criterio". Dime qué etapa te confunde más (empezar, seguir o revisar) y te propongo un paso concreto para despejar el panorama.'
-    
-    elif intent == "expresar_emocion":
-        # Detectar qué emoción mencionó y dar estrategia metamotivacional
-        sentimiento = guess_sentimiento(user_text)
-        if sentimiento:
-            return _get_strategy_by_emotion(sentimiento, slots)
-        return "Entiendo. A veces es difícil concentrarse o encontrar motivación. ¿Qué tipo de trabajo tienes que hacer? Así puedo darte una estrategia concreta."
-
-    # Nivel 2: Estrategias metamotivacionales por COMBINACIÓN de factores
-    if slots.tipo_tarea and slots.sentimiento:
-        strategy = _get_metamotivational_strategy(slots)
-        if strategy:
-            return strategy
-    
-    # Nivel 2b: Detectar desajuste motivacional (Task-Motivation Fit)
-    fit_gap = _detect_fit_gap(slots)
-    if fit_gap:
-        return fit_gap
-    
-    # Nivel 3: Si tenemos tipo de tarea pero no sentimiento, dar estrategia general por tarea
-    if slots.tipo_tarea:
-        estrategias = _get_task_strategies()
-        estrategia = estrategias.get(slots.tipo_tarea, None)
-        if estrategia:
-            return f"Entiendo. {estrategia}"
-    
-    # Nivel 4: Detectar palabras clave en el texto actual para dar respuesta contextual
-    if re.search(r'\b(programar|código|chatbot|app|software)\b', user_text.lower()):
-        return "Enfoquemos la programación en micro-tramos: elige UNA funcionalidad pequeña, abre el archivo y deja solo lo necesario para esa parte. Trabaja 18 minutos, prueba lo que hiciste y luego me cuentas si necesitas otro ajuste."
-    
-    if re.search(r'\b(leer|estudiar|libro|paper|artículo)\b', user_text.lower()):
-        return "Para lectura técnica usa modo barrido: cronometra 12 minutos, subraya solo ideas fuerza y deja un post-it con la duda más grande. Así mantenemos foco sin agobiarnos."
-    
-    if re.search(r'\b(escribir|ensayo|texto|redactar)\b', user_text.lower()):
-        return "Vamos con escritura guiada: escribe tres bullets con idea principal, ejemplo y frase de cierre. Nada de redactar completo todavía; solo estructura rápida en 10 minutos y luego vemos si extendemos."
-    
-    if re.search(r'\b(ejercicio|problema|matemática|física|cálculo)\b', user_text.lower()):
-        return "Divide los ejercicios en un lote mínimo: resuelve solo 2-3 problemas gemelos, anota los pasos clave y detente para revisar patrones. 15 minutos bastan para destrabar."
-    
-    # Nivel 5: Respuesta genérica pero útil (siempre funciona)
-    return (
-        f"Vamos directo a la acción. Haz este micro-plan estándar:\n"
-        "1. Anota en un post-it qué quieres dejar listo en los próximos 12 minutos.\n"
-        "2. Trabaja ese bloque con el celular lejos y enfócate solo en completar ese mini entregable.\n"
-        "3. Al terminar, marca lo logrado y dime si necesitamos cambiar la táctica."
-    )
-
-
-def _get_strategy_by_emotion(sentimiento: str, slots: Slots) -> str:
-    """Estrategias específicas por emoción según teoría metamotivacional"""
-    
-    if sentimiento == "aburrimiento":
-        # Aburrimiento = tarea poco desafiante → incrementar desafío o variar
-        if slots.plazo in ["hoy", "<24h"]:
-            return "Entiendo que te sientas aburrido. Cuando las tareas son urgentes y aburridas, ayuda hacerlas en sprints cortos. Te propongo: trabaja 15 minutos intensos, descansa 5, y repite. El tiempo límite hace que sea menos monótono. ¿Qué parte puedes hacer primero?"
-        else:
-            return "Entiendo que te sientas aburrido. El aburrimiento aparece cuando las tareas son poco desafiantes. ¿Qué tal si te pones un pequeño reto? Por ejemplo: termina una sección específica en 20 minutos. Tener un límite lo hace más interesante. ¿Qué tarea tienes?"
-    
-    elif sentimiento == "ansiedad_error":
-        # Ansiedad = miedo a equivocarse → reducir stakes, enfoque en proceso
-        return "Entiendo tu ansiedad. Cuando nos presionamos mucho, ayuda cambiar el enfoque: en vez de buscar perfección, busca PROGRESO. Te propongo: haz una versión 'borrador terrible' primero. Sin juzgar. Solo avanza 15 minutos. Después puedes mejorar. ¿Qué tarea es?"
-    
-    elif sentimiento == "frustracion":
-        # Frustración = tarea muy difícil o bloqueado → simplificar, bajar nivel
-        return "Entiendo tu frustración. A veces nos trabamos porque la tarea es muy grande o compleja. Te sugiero: divide en la PARTE MÁS PEQUEÑA posible. ¿Cuál es el primer micro-paso que puedes hacer en 10 minutos? No importa qué tan pequeño sea. ¿Qué estás intentando hacer?"
-    
-    elif sentimiento == "dispersion_rumiacion":
-        # Dispersión = distracción/rumiación → tareas concretas, externos
-        return "Entiendo que te cueste concentrarte. Cuando la mente divaga, ayuda tener tareas MUY concretas y mecánicas. Te propongo: haz algo que no requiera pensar mucho, como organizar materiales, copiar citas, o hacer un esquema simple. 10 minutos. ¿Qué tarea tienes pendiente?"
-    
-    elif sentimiento == "baja_autoeficacia":
-        # Baja autoeficacia = duda de capacidad → éxitos pequeños, validación
-        return "Entiendo que dudes de ti. Cuando nos sentimos así, necesitamos victorias pequeñas. Te propongo: elige la parte MÁS FÁCIL de tu tarea y hazla primero. Sin importar cuán simple sea. Cuando la termines, sentirás que sí puedes. ¿Cuál es la parte más fácil de lo que tienes que hacer?"
-    
-    return "Entiendo cómo te sientes. Cuéntame qué tarea tienes que hacer y busquemos juntos una forma de avanzar que se ajuste a cómo te sientes ahora."
-
-
-def _get_metamotivational_strategy(slots: Slots) -> Optional[str]:
-    """
-    Genera estrategias basadas en AJUSTE (FIT) metamotivacional
-    Combina: tipo_tarea × sentimiento × fase × plazo
-    """
-    
-    tarea = slots.tipo_tarea
-    sent = slots.sentimiento
-    fase = slots.fase
-    plazo = slots.plazo
-    
-    # ENSAYOS - Tareas creativas de alto nivel
-    if tarea == "ensayo":
-        if sent == "aburrimiento":
-            if fase == "ideacion":
-                return "Entiendo que te aburra pensar en el ensayo. Te propongo algo diferente: en vez de 'ideas', escribe 3 preguntas provocadoras sobre el tema. Preguntas que te den curiosidad. 10 minutos. Las ideas fluyen mejor así. ¿Cuál es el tema?"
-            else:
-                return "Entiendo que te aburra escribir. Prueba esto: escribe como si le explicaras el tema a un niño de 10 años. Sin términos técnicos, solo ideas simples. 15 minutos. Es más entretenido y después lo formalizas. ¿De qué es el ensayo?"
-        
-        elif sent == "ansiedad_error":
-            return "Entiendo tu ansiedad con el ensayo. La presión por hacerlo perfecto paraliza. Te propongo: escribe un 'brain dump' terrible. Vomita todas las ideas sin estructura, sin gramática, sin nada. 15 minutos. Después ordenas. ¿Cuál es el tema?"
-        
-        elif sent == "frustracion":
-            if fase in ["ideacion", "planificacion"]:
-                return "Entiendo tu frustración. Cuando nos trabamos pensando, ayuda hacer algo concreto. Te sugiero: solo haz un esquema de 3 puntos: Inicio, Medio, Final. Sin desarrollar. 10 minutos. ¿De qué es el ensayo?"
-            else:
-                return "Entiendo tu frustración con el ensayo. Cuando nos trabamos escribiendo, ayuda cambiar de sección. ¿Hay alguna parte del ensayo que sea más fácil o que te guste más? Empieza por esa. 15 minutos."
-    
-    # EJERCICIOS/PROBLEMAS - Tareas analíticas repetitivas
-    elif tarea == "resolver_problemas":
-        if sent == "aburrimiento":
-            return "Entiendo que te aburran los ejercicios. Prueba esto: ponte un reto de velocidad. ¿Cuántos ejercicios puedes resolver en 15 minutos? Sin revisar, solo resolver. Después revisas. El desafío lo hace menos monótono. ¿De qué materia son?"
-        
-        elif sent == "ansiedad_error":
-            return "Entiendo tu ansiedad con los ejercicios. El miedo a equivocarse paraliza. Te propongo: resuelve los ejercicios EN LÁPIZ, permitiéndote borrar y equivocarte. Haz solo 3 ejercicios sin juzgarte. 15 minutos. ¿De qué materia son?"
-        
-        elif sent == "frustracion":
-            return "Entiendo tu frustración con los ejercicios. Cuando nos trabamos, ayuda cambiar de estrategia. Te sugiero: SALTA los ejercicios difíciles temporalmente. Haz solo los que sabes hacer. 15 minutos. Vuelves a los difíciles después con más confianza."
-        
-        elif sent == "dispersion_rumiacion":
-            return "Entiendo que te cueste concentrarte. Los ejercicios son buenos para esto porque son concretos. Te propongo: resuelve solo 1 ejercicio completo. Sin celular cerca. Solo ese uno. Unos 10 minutos. Después decides si sigues. ¿De qué materia son?"
-    
-    # LECTURA - Tareas de procesamiento de información
-    elif tarea == "lectura_tecnica":
-        if sent == "aburrimiento":
-            return "Entiendo que te aburra leer. Prueba esto: lee BUSCANDO respuestas a 3 preguntas específicas que te hagas antes de empezar. No leas pasivo. Lee como detective. 15 minutos. ¿De qué tema es la lectura?"
-        
-        elif sent == "ansiedad_error":
-            return "Entiendo tu ansiedad con la lectura. La presión por 'entender todo' agobia. Te propongo: solo subraya lo que creas importante. Sin tomar apuntes. Solo marca. 15 minutos. Después decides qué hacer con eso. ¿De qué tema es?"
-        
-        elif sent == "dispersion_rumiacion":
-            return "Entiendo que te cueste concentrarte al leer. Te sugiero: lee EN VOZ ALTA (aunque sea susurrando). Obliga a tu mente a enfocarse. Solo 10 minutos de las primeras páginas. ¿De qué tema es la lectura?"
-        
-        elif plazo in ["hoy", "<24h"]:
-            return "Entiendo que tengas poco tiempo para leer. Te sugiero lectura estratégica: lee solo la introducción, conclusión y los primeros párrafos de cada sección. 15 minutos. Captarás las ideas principales. ¿De qué tema es?"
-    
-    # PRESENTACIONES - Tareas de síntesis y diseño
-    elif tarea == "presentacion":
-        if sent == "ansiedad_error":
-            return "Entiendo tu ansiedad con la presentación. La presión por hacerla perfecta paraliza. Te propongo: crea solo el ÍNDICE de slides. Sin diseño, sin texto extenso. Solo títulos. 10 minutos. El contenido viene después. ¿De qué tema es?"
-        
-        elif sent == "aburrimiento":
-            return "Entiendo que te aburra hacer la presentación. Prueba esto: empieza buscando 3 imágenes o gráficos llamativos sobre tu tema. Sin texto. Solo visuales. 15 minutos. Te dará ideas y es más entretenido. ¿De qué es la presentación?"
-        
-        elif fase == "ideacion":
-            return "Entiendo que estés empezando la presentación. Te sugiero: anota solo los 5 mensajes clave que quieres que tu audiencia recuerde. Sin desarrollar. Solo 5 frases. 10 minutos. Eso es tu columna vertebral. ¿De qué tema es?"
-    
-    # CÓDIGO/PROGRAMACIÓN - Tareas técnicas de construcción
-    elif tarea == "coding_bugfix":
-        if sent == "frustracion":
-            return "Entiendo tu frustración con el código. Cuando nos trabamos, ayuda 'duck debugging': explícale tu código EN VOZ ALTA a un objeto (o a mí). Línea por línea. 10 minutos. Muchas veces encuentras el error explicándolo. ¿Qué bug estás buscando?"
-        
-        elif sent == "ansiedad_error":
-            return "Entiendo tu ansiedad al programar. El miedo a romper cosas paraliza. Te propongo: haz una COPIA del código primero. Luego experimenta sin miedo. Si falla, vuelves a la copia. 20 minutos de prueba y error seguro. ¿Qué estás programando?"
-        
-        elif sent == "dispersion_rumiacion":
-            return "Entiendo que te cueste concentrarte programando. Te sugiero: programa SOLO una función pequeña. Sin pensar en el resto. Solo esa función. Prúebala. 15 minutos. Lo concreto ayuda a enfocar. ¿Qué funcionalidad estás haciendo?"
-    
-    # REVISIÓN/PROOFREADING - Tareas de refinamiento
-    elif tarea == "proofreading":
-        if sent == "aburrimiento":
-            return "Entiendo que te aburra revisar. Prueba esto: revisa LEYENDO HACIA ATRÁS. De la última oración a la primera. Suena raro pero te obliga a prestar atención a cada palabra. 15 minutos. ¿Qué texto estás revisando?"
-        
-        elif plazo in ["hoy", "<24h"]:
-            return "Entiendo que tengas poco tiempo para revisar. Te sugiero priorizar: busca solo errores graves (argumentos flojos, datos incorrectos, errores de ortografía evidentes). Sin perfeccionar. 15 minutos. ¿Qué estás revisando?"
-    
-    return None
-
-
-def _get_task_strategies() -> Dict[str, str]:
-    """Estrategias generales por tipo de tarea (sin considerar sentimiento)"""
-    return {
-        "ensayo": "Para tu ensayo, te sugiero empezar con algo pequeño: escribe solo 3 ideas principales en bullets. Sin redactar, solo ideas clave. Unos 10 minutos. ¿Cómo te suena?",
-        "resolver_problemas": "Para tus ejercicios, te propongo: resuelve solo los 3 primeros, sin presión de terminar todo. Unos 15 minutos. Cuando termines esos 3, ya avanzaste.",
-        "lectura_tecnica": "Para tu lectura, te sugiero: lee solo las primeras 3-5 páginas, subrayando solo las ideas principales. Sin apuntes extensos. Unos 12 minutos. ¿Te parece?",
-        "presentacion": "Para tu presentación, ¿qué tal si creas solo el índice de los temas que vas a cubrir? Sin desarrollar nada, solo títulos. Unos 10 minutos.",
-        "coding_bugfix": "Para tu código, te sugiero: trabaja solo en una función o componente pequeño. Sin intentar arreglar todo. Unos 15-20 minutos enfocados.",
-        "proofreading": "Para revisar, te propongo: revisa solo la primera página o sección. Busca solo errores evidentes, no perfección. Unos 10 minutos.",
-        "mcq": "Para tu prueba, te sugiero: responde solo las preguntas que sabes con seguridad primero. Sin quedarte pensando mucho. Unos 15 minutos.",
-        "esquema": "Para tu esquema, te propongo: solo anota las 3-5 secciones principales. Sin detalles. Solo estructura. 10 minutos.",
-        "borrador": "Para tu borrador, te sugiero: escribe libremente sin juzgar. No edites mientras escribes. Solo avanza. 15 minutos.",
-        "resumen": "Para tu resumen, te propongo: subraya las 5 ideas más importantes del texto original. Solo subrayar, no escribir aún. 10 minutos.",
-        "protocolo_lab": "Para tu protocolo de lab, te sugiero: solo completa la sección de materiales y métodos. Sin análisis aún. 15 minutos."
-    }
-
-
-def _detect_fit_gap(slots: Slots) -> Optional[str]:
-    """Detecta desajustes entre tarea, emoción y contexto para reencuadrar según Task-Motivation Fit"""
-    if not slots.tipo_tarea:
-        return None
-    creative_tasks = {"ensayo", "esquema", "borrador", "presentacion"}
-    analytic_tasks = {"resolver_problemas", "mcq", "protocolo_lab", "coding_bugfix", "lectura_tecnica", "proofreading"}
-    plazo = slots.plazo
-    sentimiento = slots.sentimiento
-    fase = slots.fase
-    
-    if slots.tipo_tarea in creative_tasks and plazo in ["hoy", "<24h"]:
-        return "Veo que tu tarea es creativa pero el plazo es cortísimo. En teoría metamotivacional eso es un choque promoción vs prevención. Hagamos un switch a modo prevención: define solo el mínimo entregable (p.ej. introducción + esquema) en 15 minutos para asegurar avance tangible."
-    
-    if slots.tipo_tarea in analytic_tasks and sentimiento == "aburrimiento":
-        return "Las tareas analíticas repetitivas pueden bajar la activación. Para recuperar el match motivacional, conviértelo en un reto de eficiencia: mide cuántos ejercicios o páginas revisas en 12 minutos y trata de superarte." 
-    
-    if sentimiento == "ansiedad_error" and fase in ["ideacion", "planificacion"]:
-        return "Estás en fase exploratoria pero tu foco interno es de prevención. Para bajar la ansiedad, define un prototipo feo: escribe ideas sin juzgar y marca con ⭐ lo que valga la pena pulir después."
-    
-    if sentimiento == "dispersion_rumiacion" and slots.tipo_tarea in creative_tasks:
-        return "Cuando la mente divaga y la tarea exige creatividad, usamos anclajes sensoriales. Abre un nuevo doc y escribe solo una lista numerada con 5 lugares donde podrías comenzar. No desarrolles, solo lista."
-    
-    return None
-
-def _refresh_repeated_response(new_reply: str, last_reply: Optional[str], user_text: str) -> str:
-    """Evita respuestas idénticas agregando reconocimiento del aporte del usuario"""
-    if not last_reply or not new_reply:
-        return new_reply
-    if new_reply.strip() != last_reply.strip():
-        return new_reply
-    detail = user_text.strip()
-    if not detail:
-        detail = "lo último que mencionaste"
-    elif len(detail) > 80:
-        detail = detail[:80].rstrip() + "..."
-    return f"Anotado lo que dices (\"{detail}\"). Mantengamos la micro-estrategia, pero avísame si quieres ajustarla:\n\n{new_reply}"
-
-
-def _evaluation_quick_replies() -> List[Dict[str, str]]:
-    """Opciones estándar para evaluar la estrategia"""
-    return [
-        {"label": "✅ Me ayudó", "value": "me ayudó"},
-        {"label": "😐 Sigo igual", "value": "sigo igual"},
-        {"label": "😟 No me sirvió", "value": "no funcionó"}
-    ]
-
-
 # ---------------------------- ORQUESTADOR PRINCIPAL ---------------------------- #
 
 async def handle_user_turn(session: SessionStateSchema, user_text: str, context: str = "", chat_history: Optional[List] = None) -> Tuple[str, SessionStateSchema, Optional[List[Dict[str, str]]]]:
@@ -709,17 +305,19 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         crisis_msg = "Escucho que estás en un momento muy difícil. Por favor, busca apoyo inmediato: **llama al 4141** (línea gratuita y confidencial del MINSAL). No estás sola/o."
         return crisis_msg, session, None
     
-    # 2) Saludo inicial - DEBE IR ANTES DE CUALQUIER PROCESAMIENTO
-    user_text_lower = user_text.lower().strip()
+    # 2) Saludo único
     if not session.greeted:
         session.greeted = True
-        welcome = f"Hola! 👋 Soy {AI_NAME}, tu asistente metamotivacional.\n\nEstoy aquí para ayudarte a encontrar la mejor forma de trabajar según cómo te sientas y qué tengas que hacer.\n\n¿En qué puedo ayudarte hoy?"
-        return welcome, session, None
-    
-    # 2b) Detectar saludos simples después del saludo inicial (evitar procesamiento innecesario)
-    simple_greetings = ["hola", "holi", "hey", "hi", "buenas", "buenos días", "buenas tardes"]
-    if user_text_lower in simple_greetings:
-        return "Hola de nuevo 😊 ¿En qué puedo ayudarte hoy?", session, None
+        welcome = "😊 ¿Cómo está tu motivación hoy?"
+        quick_replies = [
+            {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
+            {"label": "😤 Frustración", "value": "Siento frustración"},
+            {"label": "😰 Ansiedad", "value": "Siento ansiedad"},
+            {"label": "🌀 Dispersión", "value": "Siento dispersión"},
+            {"label": "😔 Baja motivación", "value": "Tengo baja motivación"},
+            {"label": "💭 Otro", "value": "Siento otra cosa"}
+        ]
+        return welcome, session, quick_replies
     
     # 3) Extracción de slots
     try:
@@ -732,8 +330,6 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     # 4) Si falta dato clave, preguntar (solo en las primeras interacciones)
     missing = []
-    if not new_slots.sentimiento:
-        missing.append("sentimiento")
     if not new_slots.tipo_tarea:
         missing.append("tipo_tarea")
     if not new_slots.fase:
@@ -743,12 +339,50 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     if not new_slots.tiempo_bloque:
         missing.append("tiempo_bloque")
     
-    if missing:
-        logger.debug(f"Slots incompletos para estrategia: {missing}. Continuando con heurísticas.")
+    # Preguntar si faltan datos importantes y aún no hemos iterado mucho
+    if missing and session.iteration < 2:
+        priority = ["tipo_tarea", "plazo", "fase", "tiempo_bloque"]
+        want = next((k for k in priority if k in missing), None)
+        quick_replies = None
+        
+        if want == "tipo_tarea":
+            q = "¿Qué tipo de trabajo tienes que hacer?"
+            quick_replies = [
+                {"label": "📝 Escribir algo", "value": "Tengo que escribir un trabajo"},
+                {"label": "📖 Leer/Estudiar", "value": "Tengo que leer y estudiar"},
+                {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
+                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"}
+            ]
+        elif want == "fase":
+            q = "¿En qué etapa estás?"
+            quick_replies = [
+                {"label": "💡 Recién empezando", "value": "Estoy en la fase de ideacion"},
+                {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
+                {"label": "✍️ Haciendo el trabajo", "value": "Estoy en la fase de ejecucion"},
+                {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
+            ]
+        elif want == "plazo":
+            q = "¿Para cuándo lo necesitas?"
+            quick_replies = [
+                {"label": "🔥 Hoy", "value": "Es para hoy"},
+                {"label": "⏰ Mañana", "value": "Es para mañana"},
+                {"label": "📅 Esta semana", "value": "Es para esta semana"},
+                {"label": "🗓️ Más adelante", "value": "Tengo más de una semana"}
+            ]
+        else:
+            q = "¿Cuánto tiempo tienes disponible ahora?"
+            quick_replies = [
+                {"label": "⚡ 10 min", "value": "10"},
+                {"label": "🎯 15 min", "value": "15"},
+                {"label": "💪 25 min", "value": "25"},
+                {"label": "🔥 Más tiempo", "value": "Tengo más tiempo"}
+            ]
+        
+        return q, session, quick_replies
     
     # Defaults prudentes
     if not new_slots.tiempo_bloque:
-        new_slots.tiempo_bloque = 12
+        new_slots.tiempo_bloque = 15
         session.slots.tiempo_bloque = 12
     
     # 5) Inferir Q2, Q3, enfoque
@@ -764,7 +398,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
     # PRIMERO: Verificar si el usuario aceptó ir a bienestar (antes de otras detecciones)
-    if "quiero probar un ejercicio de bienestar" in user_text_lower or "DERIVAR_BIENESTAR" in user_text.upper():
+    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
         session.iteration = 0  # Reset para cuando vuelva
         session.last_eval_result = EvalResult(fallos_consecutivos=0)
         reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
@@ -789,7 +423,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         "bien", "muy bien", "genial", "excelente", "perfecto"
     ]
     
-    # user_text_lower ya fue declarado arriba, reutilizarlo
+    user_text_lower = user_text.lower().strip()
     
     # Verificar sin_mejora PRIMERO (tiene frases más específicas con "no")
     sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
@@ -827,8 +461,8 @@ A veces lo que sentimos no es solo un tema de organización o método de estudio
 Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
             
             quick_replies = [
-                {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
-                {"label": "🔄 Seguir con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+                {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
+                {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
             ]
             
             # Reset del contador para que no siga ofreciendo
@@ -847,12 +481,13 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
                 session.Q3 = "↑"
             
             # 2. Ajustar tamaño de tarea (hacerla más pequeña)
-            session.tiempo_bloque = 10  # Forzar bloque más corto
+            if session.tiempo_bloque and session.tiempo_bloque > 10:
+                session.tiempo_bloque = 10  # Forzar bloque más corto
+            else:
+                session.tiempo_bloque = 10
             
-            # Actualizar AMBOS para coherencia
+            # Actualizar los slots para que la generación de respuesta use el tiempo acortado
             session.slots.tiempo_bloque = 10
-            new_slots.tiempo_bloque = 10
-            
             logger.info(f"Nueva Q3: {session.Q3}, Nuevo tiempo: {session.tiempo_bloque}")
         # ****** FIN DE LA NUEVA LÓGICA DE RECALIBRACIÓN ******
         
@@ -860,71 +495,67 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         # NO hacer return aquí, dejar que el código siga y genere nueva estrategia
     
     # 7) Generar respuesta conversacional usando Gemini con historial
-    reply = None
     try:
         llm_model = genai.GenerativeModel(
             model_name='gemini-2.0-flash-exp',
             system_instruction=get_system_prompt()
         )
         
+        # Construir el historial de conversación para Gemini
         history = []
         if chat_history:
-            recent_history = chat_history[-11:-1] if len(chat_history) > 11 else chat_history[:-1]
-            for msg in recent_history:
+            for msg in chat_history[:-1]:  # Excluir el último mensaje del usuario (ya lo pasaremos aparte)
                 history.append({
                     "role": "user" if msg["role"] == "user" else "model",
                     "parts": [msg["text"]]
                 })
         
+        # Agregar contexto adicional si existe
         info_contexto = f"""
-[Info contextual]:
+[Info contextual - úsala para personalizar tu respuesta]:
 - Sentimiento: {new_slots.sentimiento or 'no especificado'}
 - Tarea: {new_slots.tipo_tarea or 'no especificada'} {f"de {new_slots.ramo}" if new_slots.ramo else ""}
 - Plazo: {new_slots.plazo or 'no especificado'}
 - Fase: {new_slots.fase or 'no especificada'}
-- Tiempo: {new_slots.tiempo_bloque or 15} min
+- Tiempo disponible: {new_slots.tiempo_bloque or 15} minutos
+{context if context else ""}
 """
         
-        gen_config = genai.types.GenerationConfig(
-            temperature=0.75,
-            max_output_tokens=400,
-            top_p=0.9
-        )
-        
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        
+        # Iniciar chat con historial
         chat = llm_model.start_chat(history=history)
+        
+        # Enviar mensaje actual con contexto
         full_message = f"{info_contexto}\n\nEstudiante: {user_text}"
         response = chat.send_message(
             full_message,
-            generation_config=gen_config,
-            safety_settings=safety_settings
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.8,
+                max_output_tokens=400,  # Aumentado para dar mejores explicaciones
+                top_p=0.95
+            )
         )
         
-        if not response.candidates:
-            raise RuntimeError("Gemini devolvió una respuesta vacía")
-        candidate = response.candidates[0]
-        finish_reason = getattr(candidate, "finish_reason", None)
-        blocked = finish_reason in (2, "SAFETY", "BLOCKED", "SAFETY_BLOCK")
-        if blocked or not candidate.content or not candidate.content.parts:
-            raise RuntimeError(f"Respuesta bloqueada o vacía (finish_reason={finish_reason})")
-        reply = candidate.content.parts[0].text.strip()
-        if not reply:
-            raise RuntimeError("Respuesta sin texto utilizable")
+        reply = response.text.strip()
+        
     except Exception as e:
-        logger.warning(f"Falló la generación con Gemini, usando estrategia interna: {e}")
-        reply = _generate_fallback_response(new_slots, user_text)
+        logger.error(f"Error generando respuesta conversacional: {e}")
+        # Fallback simple y empático
+        reply = f"Entiendo, cuéntame un poco más sobre lo que necesitas hacer. ¿Qué tipo de trabajo es y para cuándo lo necesitas?"
     
-    reply = _refresh_repeated_response(reply, session.last_strategy, user_text)
     session.iteration += 1
     session.last_strategy = reply
     
-    quick_replies = _evaluation_quick_replies()
+    # Si ya dio una estrategia (iteration >= 1), preguntar si funcionó
+    # La primera iteración es el saludo, desde la segunda ya da estrategias
+    if session.iteration >= 1:
+        quick_replies = [
+            {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+            {"label": "😐 Sigo igual", "value": "sigo igual"},
+            {"label": "😟 Me siento peor", "value": "no funcionó"}
+        ]
+    else:
+        # Solo en el primer mensaje (saludo), dejar fluir la conversación
+        quick_replies = None
     
     return reply, session, quick_replies
 
