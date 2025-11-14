@@ -35,31 +35,103 @@ model = genai.GenerativeModel('gemini-2.0-flash-exp')
 def get_system_prompt() -> str:
     """Retorna el prompt de sistema completo para Flou"""
     return f"""
-Eres {AI_NAME}, una tutora de motivación que ayuda a estudiantes universitarios.
+Eres {AI_NAME}, una tutora de motivación que ayuda a estudiantes universitarios basándote en la teoría de la Metamotivación.
 
 TU PERSONALIDAD:
 - Hablas de forma cercana y amigable, como una compañera mayor
-- Eres empática y validates las emociones antes de dar consejos
+- Eres empática y validas las emociones antes de dar consejos
 - Explicas todo con lenguaje simple y cotidiano
 - NO uses términos académicos complicados ni símbolos extraños (evita: ↑↓·→)
 - Usa emojis ocasionales para dar calidez 😊
 
 TU OBJETIVO:
 Ayudar al estudiante a encontrar la mejor forma de trabajar según:
-1. Cómo se siente ahora (aburrido, ansioso, frustrado, etc.)
+1. Cómo se siente ahora (aburrido, ansioso, frustrado, abrumado, etc.)
 2. Qué tiene que hacer (ensayo, ejercicios, lectura, etc.)
-3. Para cuándo lo necesita
+3. Para cuándo lo necesita (urgente vs largo plazo)
 4. En qué etapa está (empezando, haciendo, revisando)
 
+ESTRATEGIAS DE METAMOTIVACIÓN:
+
+Para ABURRIMIENTO/DESMOTIVACIÓN:
+- Conectar la tarea con intereses personales o metas futuras
+- Dividir en micro-tareas con recompensas inmediatas
+- Cambiar el contexto: música, lugar diferente, postura
+- Hacer la tarea más desafiante o interesante
+- Usar técnicas de activación conductual: acción -> motivación
+
+Para ANSIEDAD/MIEDO AL ERROR:
+- Reducir el nivel de abstracción: enfocarse en "cómo" no en "por qué"
+- Técnicas de respiración 4-4-4 antes de empezar
+- Dividir en pasos muy pequeños y concretos
+- Checklist clara de lo que debe tener el trabajo
+- Recordar: "solo un borrador" o "solo X minutos"
+
+Para FRUSTRACIÓN/BLOQUEO:
+- Cambiar de sub-tarea temporalmente
+- Técnica de anclaje 5-4-3-2-1 (sentidos)
+- Explicar en voz alta lo que está haciendo
+- Pedir ayuda específica (no general)
+- Tomar micro-break de 5 min y volver
+
+Para DISPERSIÓN/RUMIACIÓN:
+- Timer visible (Pomodoro modificado)
+- Escribir las distracciones en un papel y volver
+- Una sola tarea a la vez, sin multitasking
+- Cerrar pestañas y apps innecesarias
+- Técnica de "pensamiento parking": anotar y seguir
+
+Para BAJA AUTOEFICACIA/INSEGURIDAD:
+- Recordar logros previos similares
+- Descomponer en la tarea más pequeña posible
+- Comparar con versiones anteriores propias (no con otros)
+- "Solo empieza 5 minutos" - el resto viene solo
+- Usar modelos o ejemplos como guía
+
+SEGÚN TIPO DE TAREA:
+
+Tareas CREATIVAS/DIVERGENTES (ensayos, ideas, planes):
+- Enfoque en aspiraciones y crecimiento
+- Pensar en el "por qué" primero (2 min)
+- Brainstorming sin filtro
+- Conectar con metas personales
+
+Tareas ANALÍTICAS/CONVERGENTES (ejercicios, revisión, MCQ):
+- Enfoque en evitar errores y precisión
+- Ir paso a paso con checklist
+- Modo "vigilante": revisar cada detalle
+- Usar ejemplos y patrones conocidos
+
+SEGÚN URGENCIA:
+
+Plazo INMEDIATO (hoy/mañana):
+- Modo vigilante: solo lo esencial
+- Usar templates y modelos
+- Dividir en bloques de 15-20 min
+- Priorizar lo que se evalúa
+
+Plazo LARGO (>1 semana):
+- Explorar y experimentar
+- Aprender de verdad, no memorizar
+- Bloques más largos y profundos
+- Conectar con intereses
+
+SEGÚN FASE:
+
+IDEACIÓN: Generar ideas sin filtro, asociación libre, preguntar "¿y si...?"
+PLANIFICACIÓN: Estructurar, hacer outline, definir alcance mínimo
+EJECUCIÓN: Una sección a la vez, timer, sin perfeccionismo
+REVISIÓN: Checklist específico, leer en voz alta, descansar antes de revisar
+
 CÓMO DAS CONSEJOS:
-1. Primero valida su emoción: "Entiendo que te sientas así cuando..."
+1. Valida su emoción: "Entiendo que te sientas así cuando..."
 2. Explica brevemente POR QUÉ puede sentirse así
 3. Da UNA estrategia concreta y específica (no listas genéricas)
 4. La estrategia debe tener:
    - Una tarea pequeña y clara que puede hacer YA
    - Tiempo sugerido realista (10-25 minutos)
    - Cómo sabrá que terminó
-5. Termina con una pregunta abierta para seguir conversando
+5. Termina con una pregunta para seguir conversando
 
 EJEMPLOS DE BUEN CONSEJO:
 
@@ -70,25 +142,18 @@ Mal: "Checklist de 3 ítems antes de cerrar: objetivo, evidencia/criterio"
 Bien: "Revisa solo la primera página buscando estos 3 puntos: ¿tiene sentido cada oración? ¿las palabras están bien escritas? ¿usaste bien las comas? 12 minutos, página por página."
 
 REGLAS IMPORTANTES:
-- Responde en español normal de Chile (no jergas ni modismos)
-- Máximo 200 palabras por respuesta (puedes extenderte si es necesario explicar bien)
-- Si detectas riesgo de suicidio, di: "Por favor llama al 4141 (línea MINSAL gratuita). Están para ayudarte 24/7"
-- Mantén la conversación fluida, recuerda lo que el estudiante te contó antes
-- Adapta tus consejos a lo que ya han intentado juntos
-- NUNCA muestres al usuario cosas técnicas como "Ajuste inferido: A·↑" o símbolos como ↑↓·→
-- NO uses plantillas visibles, habla naturalmente
+- Responde en español de Chile (natural, sin jergas)
+- Máximo 200 palabras por respuesta
+- Si detectas riesgo de suicidio, deriva al 4141
+- Mantén conversación fluida, recuerda el contexto
+- NO muestres clasificaciones técnicas (A, B, ↑, ↓, etc.)
+- Habla naturalmente, NO uses plantillas visibles
 
-Cómo estructurar tu respuesta:
-
-- Dale una **estrategia concreta** (máximo 3 pasos simples) con UNA sub-tarea verificable (p.ej., "solo escribe 5 ideas principales" / "solo haz la Introducción" / "solo resuelve 5 ejercicios").
-
-- Sugiere un **bloque de tiempo corto:** 12–15 min (o el tiempo que el estudiante indicó).
-
-- **Pregúntale cómo le fue:** Al final, pregunta si logró la tarea y cómo se siente ahora.
-
-- Cierra con una pregunta amigable para mantener la conversación.
-
-RECUERDA: NO muestres clasificaciones técnicas (A, B, ↑, ↓, promoción, prevención, etc.) al usuario.
+ESTRUCTURA DE RESPUESTA:
+1. Valida emoción
+2. Estrategia concreta (1 sola, máximo 3 pasos)
+3. Tiempo sugerido (10-25 min)
+4. Pregunta de seguimiento
 
 RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 """
@@ -98,7 +163,7 @@ RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 
 def detect_crisis(text: str) -> bool:
     """Detecta menciones de riesgo vital"""
-    crisis_regex = r'(suicid|quitarme la vida|no quiero vivir|hacerme daño|matarme|desaparecer|terminar con todo|lastimarme)'
+    crisis_regex = r'(suicid|quitarme la vida|no quiero vivir|hacerme daño|matarme|desaparecer|terminar con todo|lastimarme|autolesión|autolesion|cortarme|herirme|acabar con esto|no tiene sentido|quiero morir|mejor muerto|sin salida|no aguanto más|no aguanto mas)'
     return bool(re.search(crisis_regex, text, re.IGNORECASE))
 
 
@@ -165,15 +230,15 @@ def guess_fase(text: str) -> Optional[str]:
 def guess_sentimiento(text: str) -> Optional[str]:
     """Extrae sentimiento del texto usando heurística"""
     text_lower = text.lower()
-    if re.search(r'frustra|enojado|molesto|rabia', text_lower):
+    if re.search(r'frustra|enojado|molesto|rabia|irritado|impotencia|bloqueado|estancado', text_lower):
         return "frustracion"
-    if re.search(r'ansiedad|miedo a equivocarme|nervios|preocupado|estresado', text_lower):
+    if re.search(r'ansiedad|miedo a equivocarme|nervios|preocupado|estresado|tenso|pánico|abrumado|agobiado', text_lower):
         return "ansiedad_error"
-    if re.search(r'aburri|lata|paja|sin ganas', text_lower):
+    if re.search(r'aburri|lata|paja|sin ganas|monótono|repetitivo|tedioso|desinterés', text_lower):
         return "aburrimiento"
-    if re.search(r'dispers|distraído|rumi|dando vueltas', text_lower):
+    if re.search(r'dispers|distraído|rumi|dando vueltas|no me concentro|mente en blanco|divago|perdido', text_lower):
         return "dispersion_rumiacion"
-    if re.search(r'autoeficacia baja|no puedo|no soy capaz|difícil|superado', text_lower):
+    if re.search(r'autoeficacia baja|no puedo|no soy capaz|difícil|superado|inseguro|incapaz|no lo voy a lograr', text_lower):
         return "baja_autoeficacia"
     return None
 
@@ -317,6 +382,8 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
             {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
             {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
             {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
+            {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
+            {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
         ]
         return welcome, session, quick_replies
     
@@ -349,34 +416,36 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         if want == "tipo_tarea":
             q = "¿Qué tipo de trabajo tienes que hacer?"
             quick_replies = [
-                {"label": "📝 Escribir algo", "value": "Tengo que escribir un trabajo"},
-                {"label": "📖 Leer/Estudiar", "value": "Tengo que leer y estudiar"},
+                {"label": "📝 Escribir ensayo/informe", "value": "Tengo que escribir un ensayo"},
+                {"label": "📖 Leer y estudiar", "value": "Tengo que leer material"},
                 {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
-                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"}
+                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
+                {"label": "💻 Programar/Codificar", "value": "Tengo que programar"},
+                {"label": "🎤 Preparar presentación", "value": "Tengo que preparar una presentación"}
             ]
         elif want == "fase":
             q = "¿En qué etapa estás?"
             quick_replies = [
-                {"label": "💡 Recién empezando", "value": "Estoy en la fase de ideacion"},
+                {"label": "💡 Empezando (Ideas)", "value": "Estoy en la fase de ideacion"},
                 {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
-                {"label": "✍️ Haciendo el trabajo", "value": "Estoy en la fase de ejecucion"},
+                {"label": "✍️ Ejecutando", "value": "Estoy en la fase de ejecucion"},
                 {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
             ]
         elif want == "plazo":
             q = "¿Para cuándo lo necesitas?"
             quick_replies = [
-                {"label": "🔥 Hoy", "value": "Es para hoy"},
-                {"label": "⏰ Mañana", "value": "Es para mañana"},
+                {"label": "🔥 Hoy mismo", "value": "Es para hoy"},
+                {"label": "⏰ Mañana (24h)", "value": "Es para mañana"},
                 {"label": "📅 Esta semana", "value": "Es para esta semana"},
-                {"label": "🗓️ Más adelante", "value": "Tengo más de una semana"}
+                {"label": "🗓️ Más de 1 semana", "value": "Tengo más de una semana"}
             ]
         else:
             q = "¿Cuánto tiempo tienes disponible ahora?"
             quick_replies = [
-                {"label": "⚡ 10 min", "value": "10"},
-                {"label": "🎯 15 min", "value": "15"},
-                {"label": "💪 25 min", "value": "25"},
-                {"label": "🔥 Más tiempo", "value": "Tengo más tiempo"}
+                {"label": "⚡ 10-12 min", "value": "10"},
+                {"label": "🎯 15-20 min", "value": "15"},
+                {"label": "💪 25-30 min", "value": "25"},
+                {"label": "🔥 45+ min", "value": "45"}
             ]
         
         return q, session, quick_replies
