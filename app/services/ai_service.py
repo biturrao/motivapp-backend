@@ -375,7 +375,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     # 2) Saludo único (si no hay historial y no se ha saludado)
     if not chat_history and not session.greeted:
         session.greeted = True
-        welcome = "¡Hola! Soy Flou, tu tutora de motivación. 😊 ¿Cómo estás hoy y qué tarea tienes en mente?"
+        welcome = "Hola, soy Flou, tu asistente Task-Motivation. 😊 Para empezar, ¿por qué no me dices cómo está tu motivación hoy?"
         quick_replies = [
             {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
             {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
