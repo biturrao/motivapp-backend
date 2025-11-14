@@ -235,12 +235,13 @@ async def get_chat_history(
                 elif "cómo está tu motivación" in last_message_text:
                     # Es el saludo inicial
                     quick_replies = [
-                        {"label": "😑 Aburrimiento", "value": "Siento aburrimiento"},
-                        {"label": "😤 Frustración", "value": "Siento frustración"},
-                        {"label": "😰 Ansiedad", "value": "Siento ansiedad"},
-                        {"label": "🌀 Dispersión", "value": "Siento dispersión"},
-                        {"label": "😔 Baja motivación", "value": "Tengo baja motivación"},
-                        {"label": "💭 Otro", "value": "Siento otra cosa"}
+                        {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
+                        {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
+                        {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
+                        {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
+                        {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
+                        {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
+                        {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
                     ]
                 else:
                     # Es una estrategia normal, mostrar opciones de evaluación
