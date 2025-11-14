@@ -249,14 +249,14 @@ async def get_chat_history(
                         {"label": "😐 Sigo igual", "value": "sigo igual"},
                         {"label": "😟 Me siento peor", "value": "no funcionó"}
                     ]
-                
-                # Agregar quick_replies al último mensaje si existen
-                if quick_replies:
-                    # Crear una versión modificada del último mensaje con quick_replies
-                    # Nota: Pydantic no permite modificar directamente, así que creamos uno nuevo
-                    last_msg_dict = message_list[-1].dict()
-                    last_msg_dict['quick_replies'] = quick_replies
-                    message_list[-1] = ChatMessageSchema(**last_msg_dict)
+            
+            # Agregar quick_replies al último mensaje si existen
+            if quick_replies:
+                # Crear una versión modificada del último mensaje con quick_replies
+                # Nota: Pydantic no permite modificar directamente, así que creamos uno nuevo
+                last_msg_dict = message_list[-1].dict()
+                last_msg_dict['quick_replies'] = quick_replies
+                message_list[-1] = ChatMessageSchema(**last_msg_dict)
         
         return ChatHistoryResponse(messages=message_list)
     except Exception as e:
