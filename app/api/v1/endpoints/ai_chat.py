@@ -215,13 +215,23 @@ async def get_chat_history(
             
             # Regenerar quick replies basándose en el estado
             quick_replies = None
+            last_message_text = message_list[-1].text.lower()
             
-            # Si ya hubo interacción (iteration >= 1), mostrar opciones de evaluación
-            if session_schema.iteration >= 1:
+            # Detectar mensaje de saludo inicial (iteration = 0 o texto contiene "cómo está tu motivación")
+            if session_schema.iteration == 0 or "cómo está tu motivación" in last_message_text:
+                # Es el saludo inicial
+                quick_replies = [
+                    {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
+                    {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
+                    {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
+                    {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
+                    {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
+                    {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
+                    {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
+                ]
+            # Si ya hubo interacción (iteration >= 1), mostrar opciones según contexto
+            elif session_schema.iteration >= 1:
                 # Verificar si no estamos en un flujo especial (derivación a bienestar)
-                last_message_text = message_list[-1].text.lower()
-                
-                # Si el mensaje menciona bienestar, es probable que sea oferta de derivación
                 if "bienestar" in last_message_text and "ejercicio" in last_message_text:
                     if "quieres probar" in last_message_text or "¿quieres" in last_message_text:
                         quick_replies = [
@@ -232,17 +242,6 @@ async def get_chat_history(
                         quick_replies = [
                             {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
                         ]
-                elif "cómo está tu motivación" in last_message_text:
-                    # Es el saludo inicial
-                    quick_replies = [
-                        {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
-                        {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
-                        {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
-                        {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
-                        {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
-                        {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
-                        {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
-                    ]
                 else:
                     # Es una estrategia normal, mostrar opciones de evaluación
                     quick_replies = [
