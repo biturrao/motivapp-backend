@@ -1,0 +1,10 @@
+# Oryx configuration
+# https://github.com/microsoft/Oryx/blob/main/doc/configuration.md
+
+# Build settings
+PRE_BUILD_COMMAND=""
+POST_BUILD_COMMAND=""
+
+# Python settings
+ENABLE_VIRTUAL_ENV=true
+DISABLE_COLLECTSTATIC=true

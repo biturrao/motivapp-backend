@@ -3,3 +3,5 @@ SCM_DO_BUILD_DURING_DEPLOYMENT=true
 ENABLE_ORYX_BUILD=true
 # Deshabilitar compresión para evitar problemas de memoria en planes F1
 COMPRESS_DESTINATION_DIR=false
+# Especificar versión de Python explícitamente
+PYTHON_VERSION=3.11
