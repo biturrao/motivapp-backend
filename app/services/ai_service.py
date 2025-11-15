@@ -858,7 +858,7 @@ async def handle_user_turn_streaming(
 """
         
         chat = llm_model.start_chat(history=history)
-        full_message = f"{info_contexto}\\n\\nEstudiante: {user_text}"
+        full_message = f"{info_contexto}\n\nEstudiante: {user_text}"
         
         log_structured("info", "gemini_request_start",
                      request_id=request_id,
