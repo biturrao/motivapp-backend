@@ -419,7 +419,23 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         ]
         return welcome, session, quick_replies
     
-    # 3) Extracción de slots
+    # 3) Detectar si es solo un saludo casual
+    casual_greetings = ["hola", "hey", "buenos días", "buenas tardes", "buenas noches", "qué tal", "saludos", "holi"]
+    is_casual_greeting = any(greeting in user_text.lower().strip() for greeting in casual_greetings) and len(user_text.strip()) < 20
+    
+    # Si es un saludo casual después del saludo inicial, responder de forma conversacional
+    if is_casual_greeting and session.greeted and session.iteration == 0:
+        casual_response = "¡Hola! 😊 Estoy aquí para ayudarte con tu trabajo académico. ¿Qué necesitas hacer hoy? Puedes contarme sobre alguna tarea o actividad que tengas pendiente."
+        session.iteration += 1
+        quick_replies = [
+            {"label": "📝 Tengo que estudiar", "value": "Tengo que estudiar"},
+            {"label": "✍️ Tengo que escribir", "value": "Tengo que escribir algo"},
+            {"label": "📚 Tengo que leer", "value": "Tengo que leer"},
+            {"label": "🤔 No sé por dónde empezar", "value": "No sé por dónde empezar"}
+        ]
+        return casual_response, session, quick_replies
+    
+    # 4) Extracción de slots
     try:
         new_slots = await extract_slots_with_llm(user_text, session.slots)
     except Exception as e:
@@ -428,7 +444,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     
     session.slots = new_slots
     
-    # 4) Si falta dato clave, preguntar (solo en las primeras interacciones)
+    # 5) Si falta dato clave, preguntar (solo en las primeras interacciones)
     missing = []
     if not new_slots.tipo_tarea:
         missing.append("tipo_tarea")
@@ -487,7 +503,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         new_slots.tiempo_bloque = 15
         session.slots.tiempo_bloque = 12
     
-    # 5) Inferir Q2, Q3, enfoque
+    # 6) Inferir Q2, Q3, enfoque
     Q2, Q3, enfoque = infer_q2_q3(new_slots)
     session.Q2 = Q2
     session.Q3 = Q3
@@ -725,7 +741,24 @@ async def handle_user_turn_streaming(
             yield {"type": "complete", "data": {"text": welcome, "session": session, "quick_replies": quick_replies}}
             return
         
-        # 3) Extracción de slots
+        # 3) Detectar si es solo un saludo casual
+        casual_greetings = ["hola", "hey", "buenos días", "buenas tardes", "buenas noches", "qué tal", "saludos", "holi"]
+        is_casual_greeting = any(greeting in user_text.lower().strip() for greeting in casual_greetings) and len(user_text.strip()) < 20
+        
+        # Si es un saludo casual después del saludo inicial, responder de forma conversacional
+        if is_casual_greeting and session.greeted and session.iteration == 0:
+            casual_response = "¡Hola! 😊 Estoy aquí para ayudarte con tu trabajo académico. ¿Qué necesitas hacer hoy? Puedes contarme sobre alguna tarea o actividad que tengas pendiente."
+            session.iteration += 1
+            quick_replies = [
+                {"label": "📝 Tengo que estudiar", "value": "Tengo que estudiar"},
+                {"label": "✍️ Tengo que escribir", "value": "Tengo que escribir algo"},
+                {"label": "📚 Tengo que leer", "value": "Tengo que leer"},
+                {"label": "🤔 No sé por dónde empezar", "value": "No sé por dónde empezar"}
+            ]
+            yield {"type": "complete", "data": {"text": casual_response, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # 4) Extracción de slots
         try:
             new_slots = await extract_slots_with_llm(user_text, session.slots)
         except Exception as e:
@@ -734,7 +767,7 @@ async def handle_user_turn_streaming(
         
         session.slots = new_slots
         
-        # 4) Preguntas de slots faltantes (no streaming, son cortas)
+        # 5) Preguntas de slots faltantes (no streaming, son cortas)
         missing = []
         if not new_slots.tipo_tarea:
             missing.append("tipo_tarea")
@@ -793,7 +826,7 @@ async def handle_user_turn_streaming(
             new_slots.tiempo_bloque = 15
             session.slots.tiempo_bloque = 12
         
-        # 5) Inferir Q2, Q3, enfoque
+        # 6) Inferir Q2, Q3, enfoque
         Q2, Q3, enfoque = infer_q2_q3(new_slots)
         session.Q2 = Q2
         session.Q3 = Q3
@@ -820,7 +853,7 @@ async def handle_user_turn_streaming(
                      metadata=metadata_event["data"])
         yield metadata_event
         
-        # 6) Generar respuesta con STREAMING
+        # 7) Generar respuesta con STREAMING
         llm_model = genai.GenerativeModel(
             model_name='gemini-2.0-flash-exp',
             system_instruction=get_system_prompt()
