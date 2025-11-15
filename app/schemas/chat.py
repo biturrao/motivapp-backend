@@ -26,7 +26,8 @@ TipoTarea = Literal[
     "protocolo_lab",
     "mcq",
     "presentacion",
-    "coding_bugfix",
+    "coding",
+    "bugfix",
     "proofreading"
 ]
 
