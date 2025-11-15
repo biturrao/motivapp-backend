@@ -806,7 +806,7 @@ async def handle_user_turn_streaming(
         session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
         
         # Enviar metadata antes de streaming
-        yield {
+        metadata_event = {
             "type": "metadata",
             "data": {
                 "Q2": Q2,
@@ -815,6 +815,10 @@ async def handle_user_turn_streaming(
                 "tiempo_bloque": session.tiempo_bloque
             }
         }
+        log_structured("info", "metadata_sent", 
+                     request_id=request_id,
+                     metadata=metadata_event["data"])
+        yield metadata_event
         
         # 6) Generar respuesta con STREAMING
         llm_model = genai.GenerativeModel(
@@ -856,6 +860,11 @@ async def handle_user_turn_streaming(
         chat = llm_model.start_chat(history=history)
         full_message = f"{info_contexto}\\n\\nEstudiante: {user_text}"
         
+        log_structured("info", "gemini_request_start",
+                     request_id=request_id,
+                     message_length=len(full_message),
+                     history_count=len(history))
+        
         # STREAMING: enviar chunks en tiempo real
         response = chat.send_message(
             full_message,
@@ -870,6 +879,8 @@ async def handle_user_turn_streaming(
         accumulated_text = ""
         chunk_count = 0
         
+        log_structured("info", "streaming_started", request_id=request_id)
+        
         for chunk in response:
             if chunk.text:
                 accumulated_text += chunk.text
@@ -878,6 +889,18 @@ async def handle_user_turn_streaming(
                     "type": "chunk",
                     "data": {"text": chunk.text}
                 }
+                
+                # Log cada 5 chunks para no saturar
+                if chunk_count % 5 == 0:
+                    log_structured("debug", "streaming_progress",
+                                 request_id=request_id,
+                                 chunk_count=chunk_count,
+                                 accumulated_length=len(accumulated_text))
+        
+        log_structured("info", "streaming_chunks_complete",
+                     request_id=request_id,
+                     total_chunks=chunk_count,
+                     total_length=len(accumulated_text))
         
         # Actualizar sesión
         session.iteration += 1
@@ -900,7 +923,7 @@ async def handle_user_turn_streaming(
                      latency_ms=round(latency, 2))
         
         # Enviar evento de completado
-        yield {
+        complete_event = {
             "type": "complete",
             "data": {
                 "session": session,
@@ -908,6 +931,11 @@ async def handle_user_turn_streaming(
                 "full_text": accumulated_text
             }
         }
+        log_structured("info", "complete_event_sent",
+                     request_id=request_id,
+                     has_quick_replies=quick_replies is not None,
+                     quick_reply_count=len(quick_replies) if quick_replies else 0)
+        yield complete_event
         
     except Exception as e:
         log_structured("error", "streaming_request_error",
