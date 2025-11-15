@@ -435,73 +435,101 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         ]
         return casual_response, session, quick_replies
     
-    # 4) Extracción de slots
+    # 4) FLUJO GUIADO POR FASES - Sistema secuencial estricto
+    # Fase 1: Sentimiento (obligatorio)
+    # Fase 2: Tipo de tarea (obligatorio)
+    # Fase 3: Plazo (obligatorio)
+    # Fase 4: Fase de trabajo (obligatorio)
+    # Fase 5: Tiempo disponible (opcional, tiene default)
+    
+    # Extraer slots del mensaje actual
     try:
         new_slots = await extract_slots_with_llm(user_text, session.slots)
     except Exception as e:
         logger.error(f"Error en extracción de slots: {e}")
         new_slots = extract_slots_heuristic(user_text, session.slots)
     
+    # Actualizar slots acumulativos
     session.slots = new_slots
     
-    # 5) Si falta dato clave, preguntar (solo en las primeras interacciones)
-    missing = []
-    if not new_slots.tipo_tarea:
-        missing.append("tipo_tarea")
-    if not new_slots.fase:
-        missing.append("fase")
-    if not new_slots.plazo:
-        missing.append("plazo")
-    if not new_slots.tiempo_bloque:
-        missing.append("tiempo_bloque")
-    
-    # Preguntar si faltan datos importantes y aún no hemos iterado mucho
-    if missing and session.iteration < 2:
-        priority = ["tipo_tarea", "plazo", "fase", "tiempo_bloque"]
-        want = next((k for k in priority if k in missing), None)
-        quick_replies = None
-        
-        if want == "tipo_tarea":
-            q = "¿Qué tipo de trabajo tienes que hacer?"
-            quick_replies = [
-                {"label": "📝 Escribir ensayo/informe", "value": "Tengo que escribir un ensayo"},
-                {"label": "📖 Leer y estudiar", "value": "Tengo que leer material"},
-                {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
-                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
-                {"label": "💻 Programar/Codificar", "value": "Tengo que programar"},
-                {"label": "🎤 Preparar presentación", "value": "Tengo que preparar una presentación"}
-            ]
-        elif want == "fase":
-            q = "¿En qué etapa estás?"
-            quick_replies = [
-                {"label": "💡 Empezando (Ideas)", "value": "Estoy en la fase de ideacion"},
-                {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
-                {"label": "✍️ Ejecutando", "value": "Estoy en la fase de ejecucion"},
-                {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
-            ]
-        elif want == "plazo":
-            q = "¿Para cuándo lo necesitas?"
-            quick_replies = [
-                {"label": "🔥 Hoy mismo", "value": "Es para hoy"},
-                {"label": "⏰ Mañana (24h)", "value": "Es para mañana"},
-                {"label": "📅 Esta semana", "value": "Es para esta semana"},
-                {"label": "🗓️ Más de 1 semana", "value": "Tengo más de una semana"}
-            ]
-        else:
-            q = "¿Cuánto tiempo tienes disponible ahora?"
-            quick_replies = [
-                {"label": "⚡ 10-12 min", "value": "10"},
-                {"label": "🎯 15-20 min", "value": "15"},
-                {"label": "💪 25-30 min", "value": "25"},
-                {"label": "🔥 45+ min", "value": "45"}
-            ]
-        
+    # FASE 1: Si no tiene sentimiento, preguntar PRIMERO
+    if not session.slots.sentimiento and session.iteration <= 3:
+        session.iteration += 1
+        q = "Para poder ayudarte mejor, ¿cómo te sientes ahora mismo con tu trabajo?"
+        quick_replies = [
+            {"label": "😑 Aburrido/a", "value": "Me siento aburrido"},
+            {"label": "😤 Frustrado/a", "value": "Me siento frustrado"},
+            {"label": "😰 Ansioso/a por equivocarme", "value": "Tengo ansiedad a equivocarme"},
+            {"label": "🌀 Distraído/a o rumiando", "value": "Estoy distraído y dando vueltas"},
+            {"label": "😔 Con baja confianza", "value": "Siento que no puedo hacerlo"},
+            {"label": "😐 Neutral, solo quiero avanzar", "value": "Me siento neutral"}
+        ]
         return q, session, quick_replies
     
-    # Defaults prudentes
-    if not new_slots.tiempo_bloque:
-        new_slots.tiempo_bloque = 15
-        session.slots.tiempo_bloque = 12
+    # FASE 2: Si tiene sentimiento pero no tipo de tarea, preguntar
+    if session.slots.sentimiento and not session.slots.tipo_tarea and session.iteration <= 4:
+        session.iteration += 1
+        q = "Perfecto. Ahora cuéntame, ¿qué tipo de trabajo necesitas hacer?"
+        quick_replies = [
+            {"label": "📝 Escribir ensayo/informe", "value": "Tengo que escribir un ensayo"},
+            {"label": "📖 Leer material técnico", "value": "Tengo que leer material"},
+            {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
+            {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
+            {"label": "💻 Programar/Codificar", "value": "Tengo que programar"},
+            {"label": "🎤 Preparar presentación", "value": "Tengo que preparar una presentación"}
+        ]
+        return q, session, quick_replies
+    
+    # FASE 3: Si tiene sentimiento y tarea, pero no plazo, preguntar
+    if session.slots.sentimiento and session.slots.tipo_tarea and not session.slots.plazo and session.iteration <= 5:
+        session.iteration += 1
+        q = "Entiendo. ¿Para cuándo necesitas tenerlo listo?"
+        quick_replies = [
+            {"label": "🔥 Hoy mismo", "value": "Es para hoy"},
+            {"label": "⏰ Mañana (24h)", "value": "Es para mañana"},
+            {"label": "📅 Esta semana", "value": "Es para esta semana"},
+            {"label": "🗓️ Más de 1 semana", "value": "Tengo más de una semana"}
+        ]
+        return q, session, quick_replies
+    
+    # FASE 4: Si tiene sentimiento, tarea y plazo, pero no fase, preguntar
+    if session.slots.sentimiento and session.slots.tipo_tarea and session.slots.plazo and not session.slots.fase and session.iteration <= 6:
+        session.iteration += 1
+        q = "Muy bien. ¿En qué etapa del trabajo estás ahora?"
+        quick_replies = [
+            {"label": "💡 Empezando (Ideas)", "value": "Estoy en la fase de ideacion"},
+            {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
+            {"label": "✍️ Ejecutando/Haciendo", "value": "Estoy en la fase de ejecucion"},
+            {"label": "🔍 Revisando/Finalizando", "value": "Estoy en la fase de revision"}
+        ]
+        return q, session, quick_replies
+    
+    # FASE 5: Si tiene todo menos tiempo, preguntar (última pregunta)
+    if (session.slots.sentimiento and session.slots.tipo_tarea and 
+        session.slots.plazo and session.slots.fase and 
+        not session.slots.tiempo_bloque and session.iteration <= 7):
+        session.iteration += 1
+        q = "Última pregunta: ¿Cuánto tiempo tienes disponible AHORA para trabajar en esto?"
+        quick_replies = [
+            {"label": "⚡ 10-12 min (mini sesión)", "value": "Tengo 10 minutos"},
+            {"label": "🎯 15-20 min (sesión corta)", "value": "Tengo 15 minutos"},
+            {"label": "💪 25-30 min (pomodoro)", "value": "Tengo 25 minutos"},
+            {"label": "🔥 45+ min (sesión larga)", "value": "Tengo 45 minutos"}
+        ]
+        return q, session, quick_replies
+    
+    # Defaults prudentes si no se proporcionó tiempo
+    if not session.slots.tiempo_bloque:
+        session.slots.tiempo_bloque = 15
+        logger.info(f"Usando tiempo por defecto: 15 minutos")
+    
+    # Logging del flujo completado
+    log_structured("info", "onboarding_complete",
+                 sentimiento=session.slots.sentimiento,
+                 tipo_tarea=session.slots.tipo_tarea,
+                 plazo=session.slots.plazo,
+                 fase=session.slots.fase,
+                 tiempo_bloque=session.slots.tiempo_bloque)
     
     # 6) Inferir Q2, Q3, enfoque
     Q2, Q3, enfoque = infer_q2_q3(new_slots)
@@ -645,13 +673,13 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
 [INSTRUCCIONES ESTRATÉGICAS DEL SISTEMA - OBEDECE ESTOS PARÁMETROS]
 1. TU MODO OPERATIVO: {modo_instruccion}
 2. TU NIVEL DE DETALLE: {nivel_instruccion}
-3. TIEMPO DISPONIBLE: {new_slots.tiempo_bloque or 15} minutos (Ajusta la tarea a este tiempo exacto)
+3. TIEMPO DISPONIBLE: {session.slots.tiempo_bloque or 15} minutos (Ajusta la tarea a este tiempo exacto)
 
 [DATOS DEL USUARIO]
-- Sentimiento detectado: {new_slots.sentimiento or 'Neutral'}
-- Tarea: {new_slots.tipo_tarea or 'General'}
-- Fase: {new_slots.fase or 'No definida'}
-- Plazo: {new_slots.plazo or 'No definido'}
+- Sentimiento detectado: {session.slots.sentimiento or 'Neutral'}
+- Tarea: {session.slots.tipo_tarea or 'General'}
+- Fase: {session.slots.fase or 'No definida'}
+- Plazo: {session.slots.plazo or 'No definido'}
 {context if context else ""}
 """
         
@@ -758,85 +786,119 @@ async def handle_user_turn_streaming(
             yield {"type": "complete", "data": {"text": casual_response, "session": session, "quick_replies": quick_replies}}
             return
         
-        # 4) Extracción de slots
+        # 4) FLUJO GUIADO POR FASES - Sistema secuencial estricto (versión streaming)
+        # Fase 1: Sentimiento (obligatorio)
+        # Fase 2: Tipo de tarea (obligatorio)
+        # Fase 3: Plazo (obligatorio)
+        # Fase 4: Fase de trabajo (obligatorio)
+        # Fase 5: Tiempo disponible (opcional, tiene default)
+        
+        # Extraer slots del mensaje actual
         try:
             new_slots = await extract_slots_with_llm(user_text, session.slots)
         except Exception as e:
             logger.error(f"Error en extracción de slots: {e}")
             new_slots = extract_slots_heuristic(user_text, session.slots)
         
+        # Actualizar slots acumulativos
         session.slots = new_slots
         
-        # 5) Preguntas de slots faltantes (no streaming, son cortas)
-        missing = []
-        if not new_slots.tipo_tarea:
-            missing.append("tipo_tarea")
-        if not new_slots.fase:
-            missing.append("fase")
-        if not new_slots.plazo:
-            missing.append("plazo")
-        if not new_slots.tiempo_bloque:
-            missing.append("tiempo_bloque")
-        
-        if missing and session.iteration < 2:
-            priority = ["tipo_tarea", "plazo", "fase", "tiempo_bloque"]
-            want = next((k for k in priority if k in missing), None)
-            quick_replies = None
-            
-            if want == "tipo_tarea":
-                q = "¿Qué tipo de trabajo tienes que hacer?"
-                quick_replies = [
-                    {"label": "📝 Escribir ensayo/informe", "value": "Tengo que escribir un ensayo"},
-                    {"label": "📖 Leer y estudiar", "value": "Tengo que leer material"},
-                    {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
-                    {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
-                    {"label": "💻 Programar/Codificar", "value": "Tengo que programar"},
-                    {"label": "🎤 Preparar presentación", "value": "Tengo que preparar una presentación"}
-                ]
-            elif want == "fase":
-                q = "¿En qué etapa estás?"
-                quick_replies = [
-                    {"label": "💡 Empezando (Ideas)", "value": "Estoy en la fase de ideacion"},
-                    {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
-                    {"label": "✍️ Ejecutando", "value": "Estoy en la fase de ejecucion"},
-                    {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
-                ]
-            elif want == "plazo":
-                q = "¿Para cuándo lo necesitas?"
-                quick_replies = [
-                    {"label": "🔥 Hoy mismo", "value": "Es para hoy"},
-                    {"label": "⏰ Mañana (24h)", "value": "Es para mañana"},
-                    {"label": "📅 Esta semana", "value": "Es para esta semana"},
-                    {"label": "🗓️ Más de 1 semana", "value": "Tengo más de una semana"}
-                ]
-            else:
-                q = "¿Cuánto tiempo tienes disponible ahora?"
-                quick_replies = [
-                    {"label": "⚡ 10-12 min", "value": "10"},
-                    {"label": "🎯 15-20 min", "value": "15"},
-                    {"label": "💪 25-30 min", "value": "25"},
-                    {"label": "🔥 45+ min", "value": "45"}
-                ]
-            
+        # FASE 1: Si no tiene sentimiento, preguntar PRIMERO
+        if not session.slots.sentimiento and session.iteration <= 3:
+            session.iteration += 1
+            q = "Para poder ayudarte mejor, ¿cómo te sientes ahora mismo con tu trabajo?"
+            quick_replies = [
+                {"label": "😑 Aburrido/a", "value": "Me siento aburrido"},
+                {"label": "😤 Frustrado/a", "value": "Me siento frustrado"},
+                {"label": "😰 Ansioso/a por equivocarme", "value": "Tengo ansiedad a equivocarme"},
+                {"label": "🌀 Distraído/a o rumiando", "value": "Estoy distraído y dando vueltas"},
+                {"label": "😔 Con baja confianza", "value": "Siento que no puedo hacerlo"},
+                {"label": "😐 Neutral, solo quiero avanzar", "value": "Me siento neutral"}
+            ]
             yield {"type": "complete", "data": {"text": q, "session": session, "quick_replies": quick_replies}}
             return
         
-        # Defaults
-        if not new_slots.tiempo_bloque:
-            new_slots.tiempo_bloque = 15
-            session.slots.tiempo_bloque = 12
+        # FASE 2: Si tiene sentimiento pero no tipo de tarea, preguntar
+        if session.slots.sentimiento and not session.slots.tipo_tarea and session.iteration <= 4:
+            session.iteration += 1
+            q = "Perfecto. Ahora cuéntame, ¿qué tipo de trabajo necesitas hacer?"
+            quick_replies = [
+                {"label": "📝 Escribir ensayo/informe", "value": "Tengo que escribir un ensayo"},
+                {"label": "📖 Leer material técnico", "value": "Tengo que leer material"},
+                {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
+                {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
+                {"label": "💻 Programar/Codificar", "value": "Tengo que programar"},
+                {"label": "🎤 Preparar presentación", "value": "Tengo que preparar una presentación"}
+            ]
+            yield {"type": "complete", "data": {"text": q, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # FASE 3: Si tiene sentimiento y tarea, pero no plazo, preguntar
+        if session.slots.sentimiento and session.slots.tipo_tarea and not session.slots.plazo and session.iteration <= 5:
+            session.iteration += 1
+            q = "Entiendo. ¿Para cuándo necesitas tenerlo listo?"
+            quick_replies = [
+                {"label": "🔥 Hoy mismo", "value": "Es para hoy"},
+                {"label": "⏰ Mañana (24h)", "value": "Es para mañana"},
+                {"label": "📅 Esta semana", "value": "Es para esta semana"},
+                {"label": "🗓️ Más de 1 semana", "value": "Tengo más de una semana"}
+            ]
+            yield {"type": "complete", "data": {"text": q, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # FASE 4: Si tiene sentimiento, tarea y plazo, pero no fase, preguntar
+        if session.slots.sentimiento and session.slots.tipo_tarea and session.slots.plazo and not session.slots.fase and session.iteration <= 6:
+            session.iteration += 1
+            q = "Muy bien. ¿En qué etapa del trabajo estás ahora?"
+            quick_replies = [
+                {"label": "💡 Empezando (Ideas)", "value": "Estoy en la fase de ideacion"},
+                {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
+                {"label": "✍️ Ejecutando/Haciendo", "value": "Estoy en la fase de ejecucion"},
+                {"label": "🔍 Revisando/Finalizando", "value": "Estoy en la fase de revision"}
+            ]
+            yield {"type": "complete", "data": {"text": q, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # FASE 5: Si tiene todo menos tiempo, preguntar (última pregunta)
+        if (session.slots.sentimiento and session.slots.tipo_tarea and 
+            session.slots.plazo and session.slots.fase and 
+            not session.slots.tiempo_bloque and session.iteration <= 7):
+            session.iteration += 1
+            q = "Última pregunta: ¿Cuánto tiempo tienes disponible AHORA para trabajar en esto?"
+            quick_replies = [
+                {"label": "⚡ 10-12 min (mini sesión)", "value": "Tengo 10 minutos"},
+                {"label": "🎯 15-20 min (sesión corta)", "value": "Tengo 15 minutos"},
+                {"label": "💪 25-30 min (pomodoro)", "value": "Tengo 25 minutos"},
+                {"label": "🔥 45+ min (sesión larga)", "value": "Tengo 45 minutos"}
+            ]
+            yield {"type": "complete", "data": {"text": q, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # Defaults prudentes si no se proporcionó tiempo
+        if not session.slots.tiempo_bloque:
+            session.slots.tiempo_bloque = 15
+            logger.info(f"Usando tiempo por defecto: 15 minutos")
+        
+        # Logging del flujo completado
+        log_structured("info", "onboarding_complete_streaming",
+                     request_id=request_id,
+                     sentimiento=session.slots.sentimiento,
+                     tipo_tarea=session.slots.tipo_tarea,
+                     plazo=session.slots.plazo,
+                     fase=session.slots.fase,
+                     tiempo_bloque=session.slots.tiempo_bloque)
         
         # 6) Inferir Q2, Q3, enfoque
-        Q2, Q3, enfoque = infer_q2_q3(new_slots)
+        Q2, Q3, enfoque = infer_q2_q3(session.slots)
         session.Q2 = Q2
         session.Q3 = Q3
         session.enfoque = enfoque
-        session.tiempo_bloque = new_slots.tiempo_bloque
+        session.tiempo_bloque = session.slots.tiempo_bloque
         
-        if not session.sentimiento_inicial and new_slots.sentimiento:
-            session.sentimiento_inicial = new_slots.sentimiento
+        if not session.sentimiento_inicial and session.slots.sentimiento:
+            session.sentimiento_inicial = session.slots.sentimiento
         
-        session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
+        session.sentimiento_actual = session.slots.sentimiento or session.sentimiento_actual
         
         # Enviar metadata antes de streaming
         metadata_event = {
@@ -880,13 +942,13 @@ async def handle_user_turn_streaming(
 [INSTRUCCIONES ESTRATÉGICAS DEL SISTEMA - OBEDECE ESTOS PARÁMETROS]
 1. TU MODO OPERATIVO: {modo_instruccion}
 2. TU NIVEL DE DETALLE: {nivel_instruccion}
-3. TIEMPO DISPONIBLE: {new_slots.tiempo_bloque or 15} minutos (Ajusta la tarea a este tiempo exacto)
+3. TIEMPO DISPONIBLE: {session.slots.tiempo_bloque or 15} minutos (Ajusta la tarea a este tiempo exacto)
 
 [DATOS DEL USUARIO]
-- Sentimiento detectado: {new_slots.sentimiento or 'Neutral'}
-- Tarea: {new_slots.tipo_tarea or 'General'}
-- Fase: {new_slots.fase or 'No definida'}
-- Plazo: {new_slots.plazo or 'No definido'}
+- Sentimiento detectado: {session.slots.sentimiento or 'Neutral'}
+- Tarea: {session.slots.tipo_tarea or 'General'}
+- Fase: {session.slots.fase or 'No definida'}
+- Plazo: {session.slots.plazo or 'No definido'}
 {context if context else ""}
 """
         
