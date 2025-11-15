@@ -3,13 +3,16 @@
 """
 Servicio de IA para Flou - Tutor Metamotivacional
 Basado en Miele & Scholer (2016) y el modelo de Task-Motivation Fit
-Usa Google Gemini 2.5 Pro para extracción de slots y generación de respuestas
+Usa Google gemini-1.5-flash para extracción de slots y generación de respuestas
 """
 
 import logging
 import re
 import json
-from typing import Optional, Dict, List, Tuple
+import time
+import uuid
+from typing import Optional, Dict, List, Tuple, AsyncGenerator
+from datetime import datetime
 import google.generativeai as genai
 
 from app.core.config import settings
@@ -18,7 +21,19 @@ from app.schemas.chat import (
     Sentimiento, TipoTarea, Fase, Plazo, TiempoBloque
 )
 
+# Configurar structured logging para observabilidad
 logger = logging.getLogger(__name__)
+
+# Structured logging helper
+def log_structured(level: str, event: str, **kwargs):
+    """Helper para logging estructurado con contexto completo"""
+    log_data = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "event": event,
+        "service": "ai_service",
+        **kwargs
+    }
+    getattr(logger, level)(json.dumps(log_data))
 
 # Configurar Gemini
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -103,10 +118,81 @@ RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 
 # ---------------------------- DETECCIÓN DE CRISIS ---------------------------- #
 
-def detect_crisis(text: str) -> bool:
-    """Detecta menciones de riesgo vital"""
-    crisis_regex = r'(suicid|quitarme la vida|no quiero vivir|hacerme daño|matarme|desaparecer|terminar con todo|lastimarme|autolesión|autolesion|cortarme|herirme|acabar con esto|no tiene sentido|quiero morir|mejor muerto|sin salida|no aguanto más|no aguanto mas)'
+def detect_crisis_regex(text: str) -> bool:
+    """Detección básica de crisis usando regex (fallback)"""
+    crisis_regex = r'\b(suicid|quitarme la vida|no quiero vivir|hacerme daño|matarme|terminar con todo|autolesión|autolesion|cortarme|acabar con esto|quiero morir|sin salida)\b'
     return bool(re.search(crisis_regex, text, re.IGNORECASE))
+
+
+async def detect_crisis(text: str) -> Dict[str, any]:
+    """
+    Detección inteligente de crisis usando LLM con temperatura 0.
+    Evita falsos positivos como 'me muero de la risa'.
+    
+    Returns:
+        Dict con 'is_crisis' (bool), 'confidence' (float), 'reason' (str)
+    """
+    start_time = time.time()
+    
+    try:
+        # Primero verificar con regex para filtrar rápido casos obvios
+        has_crisis_keywords = detect_crisis_regex(text)
+        
+        if not has_crisis_keywords:
+            log_structured("info", "crisis_check_negative", 
+                         text_length=len(text), method="regex", latency_ms=0)
+            return {"is_crisis": False, "confidence": 1.0, "reason": "No keywords detected"}
+        
+        # Si hay keywords, validar con LLM para evitar falsos positivos
+        guardrail_model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        guardrail_prompt = f"""Analiza este mensaje de un estudiante y determina si expresa ideación suicida o riesgo vital REAL.
+
+REGLAS:
+- "Me muero de la risa" o "me muero de hambre" NO son crisis.
+- Solo es crisis si hay intención explícita de hacerse daño o quitarse la vida.
+- Responde SOLO con un JSON: {{"is_crisis": true/false, "confidence": 0.0-1.0, "reason": "explicación breve"}}
+
+Mensaje: "{text}"
+
+JSON:"""
+        
+        response = guardrail_model.generate_content(
+            guardrail_prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.0,  # Determinístico
+                max_output_tokens=100
+            )
+        )
+        
+        result_text = response.text.strip()
+        json_match = re.search(r'\{[\s\S]*\}', result_text)
+        
+        if json_match:
+            result = json.loads(json_match.group(0))
+        else:
+            result = json.loads(result_text)
+        
+        latency = (time.time() - start_time) * 1000
+        
+        log_structured("warning" if result["is_crisis"] else "info",
+                     "crisis_check_complete",
+                     is_crisis=result["is_crisis"],
+                     confidence=result["confidence"],
+                     reason=result["reason"],
+                     latency_ms=round(latency, 2))
+        
+        return result
+        
+    except Exception as e:
+        # Fallback a regex en caso de error
+        logger.error(f"Error en detección inteligente de crisis: {e}")
+        is_crisis = detect_crisis_regex(text)
+        return {
+            "is_crisis": is_crisis,
+            "confidence": 0.5,
+            "reason": "Fallback to regex due to error"
+        }
 
 
 # ---------------------------- EXTRACCIÓN HEURÍSTICA ---------------------------- #
@@ -200,7 +286,7 @@ async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     Extrae slots estructurados del texto libre usando Gemini 1.5 Flash
     """
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-pro')
+        llm_model = genai.GenerativeModel('gemini-1.5-flash')
         
         sys_prompt = """Extrae como JSON compacto los campos del texto del usuario:
 - sentimiento: aburrimiento|frustracion|ansiedad_error|dispersion_rumiacion|baja_autoeficacia|otro
@@ -309,8 +395,12 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     Retorna (respuesta_texto, session_actualizada, quick_replies)
     """
     
-    # 1) Crisis
-    if detect_crisis(user_text):
+    # 1) Crisis detection con LLM inteligente
+    crisis_result = await detect_crisis(user_text)
+    if crisis_result["is_crisis"] and crisis_result["confidence"] > 0.7:
+        log_structured("critical", "crisis_detected", 
+                     confidence=crisis_result["confidence"],
+                     reason=crisis_result["reason"])
         crisis_msg = "Escucho que estás en un momento muy difícil. Por favor, busca apoyo inmediato: **llama al 4141** (línea gratuita y confidencial del MINSAL). No estás sola/o."
         return crisis_msg, session, None
     
@@ -586,6 +676,247 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
         quick_replies = None
     
     return reply, session, quick_replies
+
+
+# ---------------------------- FUNCIONES DE STREAMING ---------------------------- #
+
+async def handle_user_turn_streaming(
+    session: SessionStateSchema,
+    user_text: str,
+    context: str = "",
+    chat_history: Optional[List[Dict[str, str]]] = None
+) -> AsyncGenerator[Dict[str, any], None]:
+    """
+    Versión streaming del orquestador metamotivacional.
+    Genera chunks de respuesta en tiempo real para UX inmediata.
+    
+    Yields:
+        Dict con 'type' ('chunk'|'metadata'|'complete') y 'data'
+    """
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    
+    log_structured("info", "streaming_request_start",
+                 request_id=request_id,
+                 user_text_length=len(user_text),
+                 session_iteration=session.iteration)
+    
+    try:
+        # 1) Crisis detection (no streaming, debe ser inmediato)
+        crisis_result = await detect_crisis(user_text)
+        if crisis_result["is_crisis"] and crisis_result["confidence"] > 0.7:
+            crisis_msg = "Escucho que estás en un momento muy difícil. Por favor, busca apoyo inmediato: **llama al 4141** (línea gratuita y confidencial del MINSAL). No estás sola/o."
+            yield {"type": "complete", "data": {"text": crisis_msg, "session": session, "quick_replies": None}}
+            return
+        
+        # 2) Saludo (no streaming, es corto)
+        if not chat_history and not session.greeted:
+            session.greeted = True
+            welcome = "Hola, soy Flou, tu asistente Task-Motivation. 😊 Para empezar, ¿por qué no me dices cómo está tu motivación hoy?"
+            quick_replies = [
+                {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
+                {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
+                {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
+                {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
+                {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
+                {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
+                {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
+            ]
+            yield {"type": "complete", "data": {"text": welcome, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # 3) Extracción de slots
+        try:
+            new_slots = await extract_slots_with_llm(user_text, session.slots)
+        except Exception as e:
+            logger.error(f"Error en extracción de slots: {e}")
+            new_slots = extract_slots_heuristic(user_text, session.slots)
+        
+        session.slots = new_slots
+        
+        # 4) Preguntas de slots faltantes (no streaming, son cortas)
+        missing = []
+        if not new_slots.tipo_tarea:
+            missing.append("tipo_tarea")
+        if not new_slots.fase:
+            missing.append("fase")
+        if not new_slots.plazo:
+            missing.append("plazo")
+        if not new_slots.tiempo_bloque:
+            missing.append("tiempo_bloque")
+        
+        if missing and session.iteration < 2:
+            priority = ["tipo_tarea", "plazo", "fase", "tiempo_bloque"]
+            want = next((k for k in priority if k in missing), None)
+            quick_replies = None
+            
+            if want == "tipo_tarea":
+                q = "¿Qué tipo de trabajo tienes que hacer?"
+                quick_replies = [
+                    {"label": "📝 Escribir ensayo/informe", "value": "Tengo que escribir un ensayo"},
+                    {"label": "📖 Leer y estudiar", "value": "Tengo que leer material"},
+                    {"label": "🧮 Resolver ejercicios", "value": "Tengo que resolver ejercicios"},
+                    {"label": "🔍 Revisar/Corregir", "value": "Tengo que revisar mi trabajo"},
+                    {"label": "💻 Programar/Codificar", "value": "Tengo que programar"},
+                    {"label": "🎤 Preparar presentación", "value": "Tengo que preparar una presentación"}
+                ]
+            elif want == "fase":
+                q = "¿En qué etapa estás?"
+                quick_replies = [
+                    {"label": "💡 Empezando (Ideas)", "value": "Estoy en la fase de ideacion"},
+                    {"label": "📋 Planificando", "value": "Estoy en la fase de planificacion"},
+                    {"label": "✍️ Ejecutando", "value": "Estoy en la fase de ejecucion"},
+                    {"label": "🔍 Revisando", "value": "Estoy en la fase de revision"}
+                ]
+            elif want == "plazo":
+                q = "¿Para cuándo lo necesitas?"
+                quick_replies = [
+                    {"label": "🔥 Hoy mismo", "value": "Es para hoy"},
+                    {"label": "⏰ Mañana (24h)", "value": "Es para mañana"},
+                    {"label": "📅 Esta semana", "value": "Es para esta semana"},
+                    {"label": "🗓️ Más de 1 semana", "value": "Tengo más de una semana"}
+                ]
+            else:
+                q = "¿Cuánto tiempo tienes disponible ahora?"
+                quick_replies = [
+                    {"label": "⚡ 10-12 min", "value": "10"},
+                    {"label": "🎯 15-20 min", "value": "15"},
+                    {"label": "💪 25-30 min", "value": "25"},
+                    {"label": "🔥 45+ min", "value": "45"}
+                ]
+            
+            yield {"type": "complete", "data": {"text": q, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # Defaults
+        if not new_slots.tiempo_bloque:
+            new_slots.tiempo_bloque = 15
+            session.slots.tiempo_bloque = 12
+        
+        # 5) Inferir Q2, Q3, enfoque
+        Q2, Q3, enfoque = infer_q2_q3(new_slots)
+        session.Q2 = Q2
+        session.Q3 = Q3
+        session.enfoque = enfoque
+        session.tiempo_bloque = new_slots.tiempo_bloque
+        
+        if not session.sentimiento_inicial and new_slots.sentimiento:
+            session.sentimiento_inicial = new_slots.sentimiento
+        
+        session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
+        
+        # Enviar metadata antes de streaming
+        yield {
+            "type": "metadata",
+            "data": {
+                "Q2": Q2,
+                "Q3": Q3,
+                "enfoque": enfoque,
+                "tiempo_bloque": session.tiempo_bloque
+            }
+        }
+        
+        # 6) Generar respuesta con STREAMING
+        llm_model = genai.GenerativeModel(
+            model_name='gemini-1.5-flash',
+            system_instruction=get_system_prompt()
+        )
+        
+        # Construir historial
+        history = []
+        if chat_history:
+            for msg in chat_history:
+                role = "user" if msg.get("role") == "user" else "model"
+                parts = msg.get("parts", [])
+                if isinstance(parts, str):
+                    parts = [parts]
+                if not parts and "text" in msg:
+                    parts = [msg["text"]]
+                if parts:
+                    history.append({"role": role, "parts": parts})
+        
+        # Contexto estratégico
+        modo_instruccion = "VIGILANTE (Evitar errores, ser cuidadoso)" if session.enfoque == "prevencion_vigilant" else "ENTUSIASTA (Avanzar rápido, pensar en logros)"
+        nivel_instruccion = "CONCRETO (Pasos pequeños, el 'cómo')" if session.Q3 == "↓" else "ABSTRACTO (Visión general, el 'por qué')"
+        
+        info_contexto = f"""
+[INSTRUCCIONES ESTRATÉGICAS DEL SISTEMA - OBEDECE ESTOS PARÁMETROS]
+1. TU MODO OPERATIVO: {modo_instruccion}
+2. TU NIVEL DE DETALLE: {nivel_instruccion}
+3. TIEMPO DISPONIBLE: {new_slots.tiempo_bloque or 15} minutos (Ajusta la tarea a este tiempo exacto)
+
+[DATOS DEL USUARIO]
+- Sentimiento detectado: {new_slots.sentimiento or 'Neutral'}
+- Tarea: {new_slots.tipo_tarea or 'General'}
+- Fase: {new_slots.fase or 'No definida'}
+- Plazo: {new_slots.plazo or 'No definido'}
+{context if context else ""}
+"""
+        
+        chat = llm_model.start_chat(history=history)
+        full_message = f"{info_contexto}\\n\\nEstudiante: {user_text}"
+        
+        # STREAMING: enviar chunks en tiempo real
+        response = chat.send_message(
+            full_message,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.8,
+                max_output_tokens=400,
+                top_p=0.95
+            ),
+            stream=True  # 🔥 STREAMING ACTIVADO
+        )
+        
+        accumulated_text = ""
+        chunk_count = 0
+        
+        for chunk in response:
+            if chunk.text:
+                accumulated_text += chunk.text
+                chunk_count += 1
+                yield {
+                    "type": "chunk",
+                    "data": {"text": chunk.text}
+                }
+        
+        # Actualizar sesión
+        session.iteration += 1
+        session.last_strategy = accumulated_text
+        
+        # Quick replies al final
+        quick_replies = None
+        if session.iteration >= 1:
+            quick_replies = [
+                {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+                {"label": "😐 Sigo igual", "value": "sigo igual"},
+                {"label": "😟 Me siento peor", "value": "no funcionó"}
+            ]
+        
+        latency = (time.time() - start_time) * 1000
+        log_structured("info", "streaming_request_complete",
+                     request_id=request_id,
+                     chunk_count=chunk_count,
+                     total_length=len(accumulated_text),
+                     latency_ms=round(latency, 2))
+        
+        # Enviar evento de completado
+        yield {
+            "type": "complete",
+            "data": {
+                "session": session,
+                "quick_replies": quick_replies,
+                "full_text": accumulated_text
+            }
+        }
+        
+    except Exception as e:
+        log_structured("error", "streaming_request_error",
+                     request_id=request_id,
+                     error=str(e))
+        yield {
+            "type": "error",
+            "data": {"message": "Error generando respuesta. Intenta nuevamente."}
+        }
 
 
 # ---------------------------- FUNCIONES AUXILIARES ---------------------------- #

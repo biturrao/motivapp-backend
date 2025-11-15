@@ -1,6 +1,7 @@
 # app/api/v1/endpoints/ai_chat.py
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 import logging
@@ -14,7 +15,7 @@ from app.schemas.chat import (
 )
 from app.crud import crud_chat
 from app.crud import crud_session
-from app.services.ai_service import handle_user_turn, generate_profile_summary
+from app.services.ai_service import handle_user_turn, handle_user_turn_streaming, generate_profile_summary
 from app.crud.crud_user_profile import get_profile
 from app.crud.crud_daily_check_in import get_latest_checkin
 from app.crud.crud_dashboard import get_questionnaire_summary
@@ -92,6 +93,8 @@ async def send_message(
     Envía un mensaje al chatbot y obtiene una respuesta.
     Usa el sistema metamotivacional de Flou (Miele & Scholer).
     Guarda ambos mensajes en el historial del usuario.
+    
+    Para respuestas en streaming, usar /send-stream
     """
     try:
         # Crear el mensaje del usuario
@@ -145,6 +148,107 @@ async def send_message(
     except Exception as e:
         logger.error(f"Error procesando mensaje de chat: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error al procesar el mensaje")
+
+
+@router.post("/send-stream")
+async def send_message_stream(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Envía un mensaje al chatbot y obtiene una respuesta EN STREAMING.
+    Usa Server-Sent Events (SSE) para enviar chunks en tiempo real.
+    
+    La respuesta se envía token por token para UX instantánea.
+    
+    Formato de eventos:
+    - type: 'metadata' - Información de la estrategia (Q2, Q3, enfoque)
+    - type: 'chunk' - Fragmento de texto de la respuesta
+    - type: 'complete' - Respuesta completa con sesión y quick_replies
+    - type: 'error' - Error en el procesamiento
+    """
+    try:
+        # Crear el mensaje del usuario
+        user_message = crud_chat.create_message(
+            db=db,
+            user_id=current_user.id,
+            role='user',
+            text=request.message
+        )
+        
+        # Obtener o crear sesión metamotivacional
+        session_db = crud_session.get_or_create_session(db, current_user.id)
+        session_schema = crud_session.session_to_schema(session_db)
+        
+        # Obtener historial reciente de mensajes (últimos 10)
+        chat_history_db = crud_chat.get_user_messages(db, current_user.id, limit=10)
+        chat_history = [
+            {"role": msg.role, "text": msg.text} 
+            for msg in chat_history_db
+        ]
+        
+        # Construir contexto del usuario
+        context = build_user_context(db, current_user)
+        
+        # Variable para acumular el texto completo
+        full_response_text = ""
+        
+        async def event_generator():
+            nonlocal full_response_text
+            
+            try:
+                async for event in handle_user_turn_streaming(
+                    session=session_schema,
+                    user_text=request.message,
+                    context=context,
+                    chat_history=chat_history
+                ):
+                    # Enviar evento SSE
+                    event_data = json.dumps(event, ensure_ascii=False)
+                    yield f"data: {event_data}\n\n"
+                    
+                    # Acumular texto de chunks
+                    if event["type"] == "chunk":
+                        full_response_text += event["data"]["text"]
+                    
+                    # Si es complete, guardar en DB
+                    if event["type"] == "complete":
+                        # Guardar sesión actualizada
+                        if "session" in event["data"]:
+                            crud_session.update_session(db, current_user.id, event["data"]["session"])
+                        
+                        # Guardar mensaje de la IA si tenemos texto
+                        text_to_save = event["data"].get("full_text") or event["data"].get("text") or full_response_text
+                        if text_to_save:
+                            crud_chat.create_message(
+                                db=db,
+                                user_id=current_user.id,
+                                role='model',
+                                text=text_to_save
+                            )
+                
+            except Exception as e:
+                logger.error(f"Error en streaming: {e}", exc_info=True)
+                error_event = {
+                    "type": "error",
+                    "data": {"message": "Error generando respuesta"}
+                }
+                yield f"data: {json.dumps(error_event)}\n\n"
+        
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Para nginx
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error iniciando streaming: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error al iniciar streaming")
 
 
 @router.get("/history", response_model=ChatHistoryResponse)
