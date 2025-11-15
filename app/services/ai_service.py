@@ -87,28 +87,6 @@ SI EL NIVEL ES "CONCRETO" (Q3 Bajo):
 
 Mantén la respuesta bajo 75 palabras. Sé "Flou": cercana, chilena natural, usa emojis.
 
-### CASOS ESPECIALES POR SENTIMIENTO
-
-Para ABURRIMIENTO:
-- MODO: ENTUSIASTA + NIVEL: ABSTRACTO
-- Conecta con metas futuras, haz la tarea interesante
-
-Para ANSIEDAD/MIEDO AL ERROR:
-- MODO: VIGILANTE + NIVEL: CONCRETO
-- Pasos micro-detallados, respiración 4-4-4
-
-Para FRUSTRACIÓN:
-- MODO: VIGILANTE + NIVEL: CONCRETO
-- Cambiar de sub-tarea, técnica 5-4-3-2-1
-
-Para DISPERSIÓN/RUMIACIÓN:
-- MODO: VIGILANTE + NIVEL: CONCRETO
-- Una tarea, timer visible, cerrar distracciones
-
-Para BAJA AUTOEFICACIA:
-- MODO: VIGILANTE + NIVEL: CONCRETO
-- Tarea mínima posible, "solo 5 minutos"
-
 ### CRISIS
 Si detectas riesgo de suicidio, deriva al 4141 inmediatamente.
 
@@ -523,6 +501,11 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         session.slots.tiempo_bloque = 15
         logger.info(f"Usando tiempo por defecto: 15 minutos")
     
+    # Marcar onboarding como completo
+    if not session.onboarding_complete:
+        session.onboarding_complete = True
+        logger.info("Onboarding completado - Generando primera estrategia")
+    
     # Logging del flujo completado
     log_structured("info", "onboarding_complete",
                  sentimiento=session.slots.sentimiento,
@@ -546,6 +529,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     # PRIMERO: Verificar si el usuario aceptó ir a bienestar (antes de otras detecciones)
     if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
         session.iteration = 0  # Reset para cuando vuelva
+        session.strategy_given = False
         session.last_eval_result = EvalResult(fallos_consecutivos=0)
         reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
         quick_replies = [
@@ -553,71 +537,75 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         ]
         return reply, session, quick_replies
     
-    # Detectar respuestas de evaluación del usuario
-    # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
-    respuestas_sin_mejora = [
-        "no funcionó", "no funciono", "no me funcionó", "no me ayudó", "no me ayudo",
-        "sigo igual", "estoy igual", "igual que antes",
-        "peor", "me siento peor", "estoy peor", "más mal",
-        "no mejoró", "no mejoro", "no ayudó", "no ayudo", 
-        "no sirvió", "no sirvio"
-    ]
-    respuestas_mejora = [
-        "me ayudó", "me ayudo", "sí me ayudó", "si me ayudo",
-        "funcionó bien", "funciono bien", "sí funcionó", "si funciono",
-        "mejor", "me siento mejor", "estoy mejor", "mucho mejor",
-        "bien", "muy bien", "genial", "excelente", "perfecto"
-    ]
-    
-    user_text_lower = user_text.lower().strip()
-    
-    # Verificar sin_mejora PRIMERO (tiene frases más específicas con "no")
-    sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
-    # Solo verificar mejora si NO detectó sin_mejora (para evitar conflictos)
-    mejora = False if sin_mejora else any(frase in user_text_lower for frase in respuestas_mejora)
-    
-    # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida
-    if mejora and session.iteration > 0:
-        session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
-        session.iteration = 0  # Reiniciar para próxima conversación
-        session.greeted = False  # Permitir nuevo saludo en próxima sesión
+    # SEGUNDO: Si ya se dio una estrategia, esperar evaluación del usuario
+    if session.strategy_given:
+        # Detectar respuestas de evaluación del usuario
+        # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
+        respuestas_sin_mejora = [
+            "no funcionó", "no funciono", "no me funcionó", "no me ayudó", "no me ayudo",
+            "sigo igual", "estoy igual", "igual que antes",
+            "peor", "me siento peor", "estoy peor", "más mal", "me siento peor",
+            "no mejoró", "no mejoro", "no ayudó", "no ayudo", 
+            "no sirvió", "no sirvio"
+        ]
+        respuestas_mejora = [
+            "me ayudó", "me ayudo", "sí me ayudó", "si me ayudo",
+            "funcionó bien", "funciono bien", "sí funcionó", "si funciono",
+            "mejor", "me siento mejor", "estoy mejor", "mucho mejor",
+            "bien", "muy bien", "genial", "excelente", "perfecto"
+        ]
         
-        reply = f"""¡Qué bueno escuchar eso! 😊 Me alegra mucho que te haya servido.
+        user_text_lower = user_text.lower().strip()
+        
+        # Verificar sin_mejora PRIMERO (tiene frases más específicas con "no")
+        sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
+        # Solo verificar mejora si NO detectó sin_mejora (para evitar conflictos)
+        mejora = False if sin_mejora else any(frase in user_text_lower for frase in respuestas_mejora)
+        
+        # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida
+        if mejora:
+            session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
+            session.strategy_given = False
+            session.onboarding_complete = False  # Reset para próxima conversación
+            session.iteration = 0
+            session.greeted = False
+            
+            reply = f"""¡Qué bueno escuchar eso! 😊 Me alegra mucho que te haya servido.
 
 Recuerda que siempre puedes volver cuando necesites apoyo o una nueva estrategia. Estoy aquí para ayudarte a encontrar tu mejor forma de trabajar.
 
 ¡Mucho éxito con tu tarea! 🚀"""
+            
+            return reply, session, None
         
-        return reply, session, None
-    
-    # Si el usuario indica que NO mejoró, incrementar contador de fallos
-    if sin_mejora and session.iteration > 0:
-        fallos = session.last_eval_result.fallos_consecutivos if session.last_eval_result else 0
-        fallos += 1
-        session.last_eval_result = EvalResult(fallos_consecutivos=fallos, cambio_sentimiento="=")
-        
-        # Verificar INMEDIATAMENTE si debe ofrecer bienestar (≥2 fallos)
-        if fallos >= 2:
-            reply = f"""Veo que hemos intentado un par de estrategias y todavía no te sientes mejor 😔
+        # Si el usuario indica que NO mejoró, incrementar contador de fallos
+        if sin_mejora:
+            fallos = session.last_eval_result.fallos_consecutivos if session.last_eval_result else 0
+            fallos += 1
+            session.last_eval_result = EvalResult(fallos_consecutivos=fallos, cambio_sentimiento="=")
+            
+            # Verificar INMEDIATAMENTE si debe ofrecer bienestar (≥2 fallos)
+            if fallos >= 2:
+                reply = f"""Veo que hemos intentado un par de estrategias y todavía no te sientes mejor 😔
 
 A veces lo que sentimos no es solo un tema de organización o método de estudio. El cuerpo y la mente necesitan un respiro antes de seguir intentando.
 
 ¿Qué te parece si primero hacemos un ejercicio breve de bienestar? Hay algunos de respiración, relajación o mindfulness que pueden ayudarte a resetear.
 
 Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
+                
+                quick_replies = [
+                    {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
+                    {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+                ]
+                
+                # Reset del contador para que no siga ofreciendo
+                session.last_eval_result = EvalResult(fallos_consecutivos=0)
+                session.strategy_given = False  # Permitir nueva estrategia
+                
+                return reply, session, quick_replies
             
-            quick_replies = [
-                {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
-                {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
-            ]
-            
-            # Reset del contador para que no siga ofreciendo
-            session.last_eval_result = EvalResult(fallos_consecutivos=0)
-            
-            return reply, session, quick_replies
-        
-        # ****** INICIO DE LA NUEVA LÓGICA DE RECALIBRACIÓN (SI FALLOS=1) ******
-        if fallos < 2:
+            # Si fallos < 2: Recalibrar y generar nueva estrategia
             logger.info(f"Recalibrando estrategia... (Fallo {fallos})")
             
             # 1. Cambiar Q3 (de ↑→↓ o viceversa)
@@ -627,18 +615,13 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
                 session.Q3 = "↑"
             
             # 2. Ajustar tamaño de tarea (hacerla más pequeña)
-            if session.tiempo_bloque and session.tiempo_bloque > 10:
-                session.tiempo_bloque = 10  # Forzar bloque más corto
-            else:
-                session.tiempo_bloque = 10
-            
-            # Actualizar los slots para que la generación de respuesta use el tiempo acortado
+            session.tiempo_bloque = 10
             session.slots.tiempo_bloque = 10
             logger.info(f"Nueva Q3: {session.Q3}, Nuevo tiempo: {session.tiempo_bloque}")
-        # ****** FIN DE LA NUEVA LÓGICA DE RECALIBRACIÓN ******
-        
-        # Si aún no llega a 2 fallos, continuar para generar nueva estrategia
-        # NO hacer return aquí, dejar que el código siga y genere nueva estrategia
+            
+            # Marcar que NO hay estrategia dada para que genere una nueva
+            session.strategy_given = False
+            # Continuar el flujo para generar nueva estrategia (no hacer return aquí)
     
     # 7) Generar respuesta conversacional usando Gemini con historial
     try:
@@ -707,17 +690,15 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
     session.iteration += 1
     session.last_strategy = reply
     
-    # Si ya dio una estrategia (iteration >= 1), preguntar si funcionó
-    # La primera iteración es el saludo, desde la segunda ya da estrategias
-    if session.iteration >= 1:
-        quick_replies = [
-            {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
-            {"label": "😐 Sigo igual", "value": "sigo igual"},
-            {"label": "😟 Me siento peor", "value": "no funcionó"}
-        ]
-    else:
-        # Solo en el primer mensaje (saludo), dejar fluir la conversación
-        quick_replies = None
+    # Marcar que se dio una estrategia y esperar evaluación
+    session.strategy_given = True
+    
+    # Siempre dar quick replies de evaluación después de una estrategia
+    quick_replies = [
+        {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+        {"label": "😐 Sigo igual", "value": "sigo igual"},
+        {"label": "😟 Me siento peor", "value": "no funcionó"}
+    ]
     
     return reply, session, quick_replies
 
@@ -879,6 +860,11 @@ async def handle_user_turn_streaming(
             session.slots.tiempo_bloque = 15
             logger.info(f"Usando tiempo por defecto: 15 minutos")
         
+        # Marcar onboarding como completo
+        if not session.onboarding_complete:
+            session.onboarding_complete = True
+            logger.info("Onboarding completado (streaming) - Generando primera estrategia")
+        
         # Logging del flujo completado
         log_structured("info", "onboarding_complete_streaming",
                      request_id=request_id,
@@ -887,6 +873,76 @@ async def handle_user_turn_streaming(
                      plazo=session.slots.plazo,
                      fase=session.slots.fase,
                      tiempo_bloque=session.slots.tiempo_bloque)
+        
+        # SEGUNDO: Si ya dimos estrategia, detectar evaluación del usuario (streaming)
+        if session.strategy_given:
+            user_lower = user_text.lower().strip()
+            
+            # 1. Detectar evaluación positiva (mejora)
+            if any(phrase in user_lower for phrase in ["me ayudó", "me siento mejor", "funcionó", "me sirvió", "mejoré"]):
+                # ✅ ÉXITO: Despedida y cierre
+                despedida = "¡Me alegra mucho que te haya servido! 🎉 Recuerda que puedes volver cuando necesites apoyo. ¡Sigue adelante!"
+                
+                # Resetear sesión completamente
+                session.greeted = False
+                session.onboarding_complete = False
+                session.strategy_given = False
+                session.iteration = 0
+                session.Q2 = 0.0
+                session.Q3 = 0.0
+                session.enfoque = None
+                session.tiempo_bloque = None
+                session.sentimiento_inicial = None
+                session.sentimiento_actual = None
+                session.last_strategy = None
+                session.slots = Slots()
+                
+                log_structured("info", "success_closure_streaming", request_id=request_id)
+                yield {"type": "complete", "data": {"text": despedida, "session": session, "quick_replies": None}}
+                return
+            
+            # 2. Detectar evaluación negativa (sin mejora)
+            if any(phrase in user_lower for phrase in ["sigo igual", "no funcionó", "no me sirvió", "me siento peor", "no ayudó"]):
+                # Incrementar contador de fallos
+                if not hasattr(session, 'failed_attempts'):
+                    session.failed_attempts = 0
+                session.failed_attempts += 1
+                
+                log_structured("info", "strategy_failure_streaming",
+                             request_id=request_id,
+                             failed_attempts=session.failed_attempts)
+                
+                # Si ya intentamos 2 veces, derivar a bienestar
+                if session.failed_attempts >= 2:
+                    bienestar_msg = (
+                        "Entiendo que las estrategias no han funcionado esta vez. "
+                        "A veces necesitamos un enfoque más profundo. Te sugiero explorar la **pestaña de Bienestar** "
+                        "donde encontrarás recursos para gestionar emociones y recuperar tu energía. "
+                        "¿Te gustaría que te lleve allí ahora?"
+                    )
+                    quick_replies = [
+                        {"label": "Sí, ir a Bienestar", "value": "ir a bienestar", "navigate_to": "wellness"},
+                        {"label": "Prefiero intentar otra cosa", "value": "intentar otra estrategia"}
+                    ]
+                    
+                    # Resetear para que si vuelve, empiece de cero
+                    session.strategy_given = False
+                    session.failed_attempts = 0
+                    
+                    yield {"type": "complete", "data": {"text": bienestar_msg, "session": session, "quick_replies": quick_replies}}
+                    return
+                
+                # Primer o segundo fallo: recalibrar y generar nueva estrategia
+                recal_msg = (
+                    "Entiendo, esa estrategia no te ayudó. Voy a recalibrar y proponerte un enfoque diferente. "
+                    "Dame un momento..."
+                )
+                yield {"type": "chunk", "data": {"text": recal_msg}}
+                
+                # Resetear flag para generar nueva estrategia
+                session.strategy_given = False
+                # NO resetear onboarding_complete, conservar los slots
+                # Continuar al flujo de generación...
         
         # 6) Inferir Q2, Q3, enfoque
         Q2, Q3, enfoque = infer_q2_q3(session.slots)
@@ -1001,14 +1057,15 @@ async def handle_user_turn_streaming(
         session.iteration += 1
         session.last_strategy = accumulated_text
         
-        # Quick replies al final
-        quick_replies = None
-        if session.iteration >= 1:
-            quick_replies = [
-                {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
-                {"label": "😐 Sigo igual", "value": "sigo igual"},
-                {"label": "😟 Me siento peor", "value": "no funcionó"}
-            ]
+        # Marcar que se dio una estrategia y esperar evaluación
+        session.strategy_given = True
+        
+        # Siempre dar quick replies de evaluación después de una estrategia
+        quick_replies = [
+            {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+            {"label": "😐 Sigo igual", "value": "sigo igual"},
+            {"label": "😟 Me siento peor", "value": "no funcionó"}
+        ]
         
         latency = (time.time() - start_time) * 1000
         log_structured("info", "streaming_request_complete",

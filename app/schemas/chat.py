@@ -61,6 +61,8 @@ class EvalResult(BaseModel):
 class SessionStateSchema(BaseModel):
     """Estado de la sesión metamotivacional"""
     greeted: bool = False
+    onboarding_complete: bool = False  # Indica si se completó el onboarding
+    strategy_given: bool = False  # Indica si ya se dio una estrategia (esperando evaluación)
     iteration: int = 0
     sentimiento_inicial: Optional[str] = None
     sentimiento_actual: Optional[str] = None
