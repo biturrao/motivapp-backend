@@ -204,6 +204,14 @@ async def send_message_stream(
                     context=context,
                     chat_history=chat_history
                 ):
+                    # Convertir objetos Pydantic a dict para serialización JSON
+                    if event["type"] == "complete" and "session" in event["data"]:
+                        session_obj = event["data"]["session"]
+                        if hasattr(session_obj, 'dict'):
+                            event["data"]["session"] = session_obj.dict()
+                        elif hasattr(session_obj, '__dict__'):
+                            event["data"]["session"] = session_obj.__dict__
+                    
                     # Enviar evento SSE
                     event_data = json.dumps(event, ensure_ascii=False)
                     yield f"data: {event_data}\n\n"
@@ -216,7 +224,15 @@ async def send_message_stream(
                     if event["type"] == "complete":
                         # Guardar sesión actualizada
                         if "session" in event["data"]:
-                            crud_session.update_session(db, current_user.id, event["data"]["session"])
+                            # Reconstruir el SessionStateSchema desde el dict para guardarlo
+                            session_dict = event["data"]["session"]
+                            if isinstance(session_dict, dict):
+                                from app.schemas.chat import SessionStateSchema
+                                updated_session = SessionStateSchema(**session_dict)
+                                crud_session.update_session(db, current_user.id, updated_session)
+                            else:
+                                # Si ya es un schema, guardarlo directamente
+                                crud_session.update_session(db, current_user.id, session_dict)
                         
                         # Guardar mensaje de la IA si tenemos texto
                         text_to_save = event["data"].get("full_text") or event["data"].get("text") or full_response_text

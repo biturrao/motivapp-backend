@@ -3,7 +3,7 @@
 """
 Servicio de IA para Flou - Tutor Metamotivacional
 Basado en Miele & Scholer (2016) y el modelo de Task-Motivation Fit
-Usa Google gemini-1.5-flash para extracción de slots y generación de respuestas
+Usa Google gemini-2.0-flash-exp para extracción de slots y generación de respuestas
 """
 
 import logging
@@ -42,7 +42,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 AI_NAME = 'Flou'
 
 # Modelo por defecto (exportado para compatibilidad con wellness.py)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 
 # ---------------------------- PROMPT DE SISTEMA ---------------------------- #
@@ -144,7 +144,7 @@ async def detect_crisis(text: str) -> Dict[str, any]:
             return {"is_crisis": False, "confidence": 1.0, "reason": "No keywords detected"}
         
         # Si hay keywords, validar con LLM para evitar falsos positivos
-        guardrail_model = genai.GenerativeModel('gemini-1.5-flash')
+        guardrail_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         guardrail_prompt = f"""Analiza este mensaje de un estudiante y determina si expresa ideación suicida o riesgo vital REAL.
 
@@ -283,10 +283,10 @@ def guess_ramo(text: str) -> Optional[str]:
 
 async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
     """
-    Extrae slots estructurados del texto libre usando Gemini 1.5 Flash
+    Extrae slots estructurados del texto libre usando Gemini 2.0 Flash
     """
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-flash')
+        llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         sys_prompt = """Extrae como JSON compacto los campos del texto del usuario:
 - sentimiento: aburrimiento|frustracion|ansiedad_error|dispersion_rumiacion|baja_autoeficacia|otro
@@ -599,7 +599,7 @@ Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
     # 7) Generar respuesta conversacional usando Gemini con historial
     try:
         llm_model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
+            model_name='gemini-2.0-flash-exp',
             system_instruction=get_system_prompt()
         )
         
@@ -818,7 +818,7 @@ async def handle_user_turn_streaming(
         
         # 6) Generar respuesta con STREAMING
         llm_model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
+            model_name='gemini-2.0-flash-exp',
             system_instruction=get_system_prompt()
         )
         
@@ -929,7 +929,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
     logger.warning("Usando generate_chat_response legacy - considera migrar a handle_user_turn")
     
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-flash')
+        llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         full_prompt = get_system_prompt() + "\n\n"
         if context:
@@ -954,7 +954,7 @@ async def generate_chat_response(user_message: str, context: Optional[str] = Non
 async def generate_profile_summary(profile: dict) -> str:
     """Genera un resumen del perfil del usuario usando Gemini"""
     try:
-        llm_model = genai.GenerativeModel('gemini-1.5-flash')
+        llm_model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         summary_prompt = f"""
 ### Rol
