@@ -25,6 +25,8 @@ def get_or_create_session(db: Session, user_id: int) -> SessionState:
             session = SessionState(
                 user_id=user_id,
                 greeted=False,
+                onboarding_complete=False,
+                strategy_given=False,
                 iteration=0,
                 slots={},
                 failed_attempts=0
@@ -40,6 +42,8 @@ def get_or_create_session(db: Session, user_id: int) -> SessionState:
         session = SessionState(
             user_id=user_id,
             greeted=False,
+            onboarding_complete=False,
+            strategy_given=False,
             iteration=0,
             slots={},
             failed_attempts=0
@@ -58,6 +62,8 @@ def update_session(db: Session, user_id: int, session_data: SessionStateSchema) 
         
         # Actualizar campos
         session.greeted = session_data.greeted
+        session.onboarding_complete = session_data.onboarding_complete
+        session.strategy_given = session_data.strategy_given
         session.iteration = session_data.iteration
         session.sentimiento_inicial = session_data.sentimiento_inicial
         session.sentimiento_actual = session_data.sentimiento_actual
@@ -86,10 +92,11 @@ def session_to_schema(session: SessionState) -> SessionStateSchema:
     Convierte el modelo de SessionState a SessionStateSchema.
     """
     slots_dict = session.slots if isinstance(session.slots, dict) else {}
-    eval_dict = session.last_eval_result if isinstance(session.last_eval_result, dict) else {}
     
     return SessionStateSchema(
         greeted=session.greeted,
+        onboarding_complete=session.onboarding_complete if hasattr(session, 'onboarding_complete') else False,
+        strategy_given=session.strategy_given if hasattr(session, 'strategy_given') else False,
         iteration=session.iteration,
         sentimiento_inicial=session.sentimiento_inicial,
         sentimiento_actual=session.sentimiento_actual,
@@ -112,6 +119,8 @@ def reset_session(db: Session, user_id: int) -> SessionState:
         session = get_or_create_session(db, user_id)
         
         session.greeted = False
+        session.onboarding_complete = False
+        session.strategy_given = False
         session.iteration = 0
         session.sentimiento_inicial = None
         session.sentimiento_actual = None
@@ -137,6 +146,8 @@ def reset_session(db: Session, user_id: int) -> SessionState:
             id=0,
             user_id=user_id,
             greeted=False,
+            onboarding_complete=False,
+            strategy_given=False,
             iteration=0,
             sentimiento_inicial=None,
             sentimiento_actual=None,

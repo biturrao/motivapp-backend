@@ -19,6 +19,8 @@ class SessionState(Base):
     
     # Estado de sesión
     greeted = Column(Boolean, default=False, nullable=False)
+    onboarding_complete = Column(Boolean, default=False, nullable=False)  # Indica si completó el onboarding
+    strategy_given = Column(Boolean, default=False, nullable=False)  # Indica si ya se dio estrategia (esperando evaluación)
     iteration = Column(Integer, default=0, nullable=False)
     
     # Sentimientos
