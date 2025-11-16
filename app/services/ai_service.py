@@ -811,10 +811,6 @@ A veces necesitamos un enfoque más profundo para gestionar emociones. Te sugier
         {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
         {"label": "❌ No funcionó", "value": "no funcionó"}
     ]
-        {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
-        {"label": "😐 Sigo igual", "value": "sigo igual"},
-        {"label": "😟 Me siento peor", "value": "no funcionó"}
-    ]
     
     return reply, session, quick_replies
 
