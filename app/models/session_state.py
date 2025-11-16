@@ -38,7 +38,7 @@ class SessionState(Base):
     
     # Estrategia y evaluación
     last_strategy = Column(Text, nullable=True)
-    last_eval_result = Column(JSON, nullable=True, default={})  # {exito: bool, cambio_sentimiento: "↑"|"="|"↓"}
+    failed_attempts = Column(Integer, default=0, nullable=False)  # Contador de estrategias fallidas consecutivas
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

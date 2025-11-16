@@ -8,7 +8,7 @@ import json
 import logging
 
 from app.models.session_state import SessionState
-from app.schemas.chat import SessionStateSchema, Slots, EvalResult
+from app.schemas.chat import SessionStateSchema, Slots
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def get_or_create_session(db: Session, user_id: int) -> SessionState:
                 greeted=False,
                 iteration=0,
                 slots={},
-                last_eval_result={}
+                failed_attempts=0
             )
             db.add(session)
             db.commit()
@@ -42,7 +42,7 @@ def get_or_create_session(db: Session, user_id: int) -> SessionState:
             greeted=False,
             iteration=0,
             slots={},
-            last_eval_result={}
+            failed_attempts=0
         )
         session.id = 0  # ID temporal
         return session
@@ -67,7 +67,7 @@ def update_session(db: Session, user_id: int, session_data: SessionStateSchema) 
         session.enfoque = session_data.enfoque
         session.tiempo_bloque = session_data.tiempo_bloque
         session.last_strategy = session_data.last_strategy
-        session.last_eval_result = session_data.last_eval_result.model_dump() if session_data.last_eval_result else {}
+        session.failed_attempts = session_data.failed_attempts
         session.updated_at = datetime.utcnow()
         
         # Solo intentar commit si la sesión tiene ID real
@@ -99,7 +99,7 @@ def session_to_schema(session: SessionState) -> SessionStateSchema:
         enfoque=session.enfoque,
         tiempo_bloque=session.tiempo_bloque,
         last_strategy=session.last_strategy,
-        last_eval_result=EvalResult(**eval_dict) if eval_dict else None
+        failed_attempts=session.failed_attempts if hasattr(session, 'failed_attempts') else 0
     )
 
 
@@ -121,7 +121,7 @@ def reset_session(db: Session, user_id: int) -> SessionState:
         session.enfoque = None
         session.tiempo_bloque = None
         session.last_strategy = None
-        session.last_eval_result = {}
+        session.failed_attempts = 0
         session.updated_at = datetime.utcnow()
         
         # Solo intentar commit si la sesión tiene ID real
@@ -146,6 +146,6 @@ def reset_session(db: Session, user_id: int) -> SessionState:
             enfoque=None,
             tiempo_bloque=None,
             last_strategy=None,
-            last_eval_result={},
+            failed_attempts=0,
             updated_at=datetime.utcnow()
         )
