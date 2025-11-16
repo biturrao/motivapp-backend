@@ -1,7 +1,7 @@
 # app/crud/crud_session.py
 
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError, DBAPIError
 from typing import Optional
 from datetime import datetime
 import json
@@ -36,8 +36,9 @@ def get_or_create_session(db: Session, user_id: int) -> SessionState:
             db.refresh(session)
         
         return session
-    except (OperationalError, ProgrammingError) as e:
-        logger.warning(f"Tabla session_states no existe aún. Usando sesión temporal en memoria: {e}")
+    except (OperationalError, ProgrammingError, DBAPIError) as e:
+        logger.warning(f"Error de base de datos al obtener sesión. Usando sesión temporal en memoria: {e}")
+        db.rollback()  # Rollback the failed transaction
         # Retornar sesión temporal sin persistencia
         session = SessionState(
             user_id=user_id,
@@ -82,8 +83,9 @@ def update_session(db: Session, user_id: int, session_data: SessionStateSchema) 
             db.refresh(session)
         
         return session
-    except (OperationalError, ProgrammingError) as e:
+    except (OperationalError, ProgrammingError, DBAPIError) as e:
         logger.warning(f"No se pudo persistir la sesión: {e}")
+        db.rollback()  # Rollback the failed transaction
         return session
 
 
@@ -139,8 +141,9 @@ def reset_session(db: Session, user_id: int) -> SessionState:
             db.refresh(session)
         
         return session
-    except (OperationalError, ProgrammingError) as e:
+    except (OperationalError, ProgrammingError, DBAPIError) as e:
         logger.warning(f"No se pudo resetear la sesión: {e}")
+        db.rollback()  # Rollback the failed transaction
         # Retornar sesión limpia temporal
         return SessionState(
             id=0,

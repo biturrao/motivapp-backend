@@ -147,6 +147,11 @@ async def send_message(
         
     except Exception as e:
         logger.error(f"Error procesando mensaje de chat: {e}", exc_info=True)
+        # Rollback any pending transactions
+        try:
+            db.rollback()
+        except:
+            pass
         raise HTTPException(status_code=500, detail="Error al procesar el mensaje")
 
 
@@ -246,6 +251,11 @@ async def send_message_stream(
                 
             except Exception as e:
                 logger.error(f"Error en streaming: {e}", exc_info=True)
+                # Rollback the database transaction
+                try:
+                    db.rollback()
+                except:
+                    pass
                 error_event = {
                     "type": "error",
                     "data": {"message": "Error generando respuesta"}
@@ -264,6 +274,11 @@ async def send_message_stream(
         
     except Exception as e:
         logger.error(f"Error iniciando streaming: {e}", exc_info=True)
+        # Rollback any pending transactions
+        try:
+            db.rollback()
+        except:
+            pass
         raise HTTPException(status_code=500, detail="Error al iniciar streaming")
 
 
@@ -381,6 +396,11 @@ async def get_chat_history(
         return ChatHistoryResponse(messages=message_list)
     except Exception as e:
         logger.error(f"Error obteniendo historial de chat: {e}")
+        # Rollback any pending transactions to prevent cascading errors
+        try:
+            db.rollback()
+        except:
+            pass
         raise HTTPException(status_code=500, detail="Error al obtener el historial")
 
 

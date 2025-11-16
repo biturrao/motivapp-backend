@@ -80,12 +80,50 @@ def migrate_section_table(db: Session):
         db.rollback()
 
 
+def migrate_session_states_table(db: Session):
+    """
+    Add new columns to session_states table if they don't exist.
+    This fixes the missing onboarding_complete, strategy_given, and failed_attempts columns.
+    """
+    try:
+        inspector = inspect(db.bind)
+        
+        # Check if table exists first
+        if 'session_states' not in inspector.get_table_names():
+            logger.info("Table session_states doesn't exist yet. Will be created by Base.metadata.create_all()")
+            return
+        
+        columns = [col['name'] for col in inspector.get_columns('session_states')]
+        
+        # Add missing columns
+        if 'onboarding_complete' not in columns:
+            logger.info("Adding 'onboarding_complete' column to session_states table...")
+            db.execute(text("ALTER TABLE session_states ADD COLUMN onboarding_complete BOOLEAN NOT NULL DEFAULT FALSE"))
+            db.commit()
+        
+        if 'strategy_given' not in columns:
+            logger.info("Adding 'strategy_given' column to session_states table...")
+            db.execute(text("ALTER TABLE session_states ADD COLUMN strategy_given BOOLEAN NOT NULL DEFAULT FALSE"))
+            db.commit()
+        
+        if 'failed_attempts' not in columns:
+            logger.info("Adding 'failed_attempts' column to session_states table...")
+            db.execute(text("ALTER TABLE session_states ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"))
+            db.commit()
+        
+        logger.info("Session states table migration completed.")
+    except Exception as e:
+        logger.error(f"Error during session_states table migration: {e}")
+        db.rollback()
+
+
 def seed_db(db: Session):
     """
     Siembra la base de datos con las secciones y preguntas iniciales.
     """
-    # First, run migration to add new columns if needed
+    # First, run migrations to add new columns if needed
     migrate_section_table(db)
+    migrate_session_states_table(db)
     
     # Comprueba si ya existen datos para no duplicar
     first_section = db.query(Section).first()
