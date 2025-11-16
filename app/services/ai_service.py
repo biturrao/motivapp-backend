@@ -625,7 +625,8 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         
         # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
         respuestas_sin_mejora = [
-            "no funcionó", "no funciono", "no me funcionó", "no me ayudó", "no me ayudo",
+            "no funcionó", "no funciono", "no me funcionó", "no me funcionó", "no funciona",
+            "no me ayudó", "no me ayudo", "no ayuda",
             "sigo igual", "estoy igual", "igual que antes",
             "peor", "me siento peor", "estoy peor", "más mal",
             "no mejoró", "no mejoro", "no ayudó", "no ayudo", 
@@ -635,14 +636,15 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
             "me ayudó", "me ayudo", "sí me ayudó", "si me ayudo",
             "funcionó bien", "funciono bien", "sí funcionó", "si funciono",
             "me siento mejor", "estoy mejor", "mucho mejor",
-            "bien", "muy bien", "genial", "excelente", "perfecto"
+            "mejor", "genial", "excelente", "perfecto"
         ]
         
         # Verificar sin_mejora PRIMERO (más específico)
+        # IMPORTANTE: Si contiene "no" antes de palabras positivas, es negativo
         sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
         
-        # Solo verificar mejora si NO es sin_mejora
-        if not sin_mejora:
+        # Solo verificar mejora si NO es sin_mejora Y no contiene negaciones
+        if not sin_mejora and "no " not in user_text_lower:
             mejora = any(frase in user_text_lower for frase in respuestas_mejora)
         else:
             mejora = False
@@ -1022,8 +1024,38 @@ async def handle_user_turn_streaming(
         if session.strategy_given:
             user_lower = user_text.lower().strip()
             
+            # Definir frases de evaluación (NEGATIVAS PRIMERO)
+            respuestas_sin_mejora = [
+                "no funcionó", "no funciono", "no me funcionó", "no me funcionó", "no funciona",
+                "no me ayudó", "no me ayudo", "no ayuda",
+                "sigo igual", "estoy igual", "igual que antes",
+                "peor", "me siento peor", "estoy peor", "más mal",
+                "no mejoró", "no mejoro", "no sirvió", "no sirvio", "no sirve"
+            ]
+            
+            respuestas_mejora = [
+                "me ayudó", "me ayudo", "sí me ayudó", "si me ayudo",
+                "funcionó bien", "funciono bien", "me siento mejor", 
+                "estoy mejor", "mucho mejor", "mejor", "genial", "excelente", "perfecto"
+            ]
+            
+            # 1. Verificar sin_mejora PRIMERO
+            sin_mejora = any(phrase in user_lower for phrase in respuestas_sin_mejora)
+            
+            # 2. Solo verificar mejora si NO es sin_mejora Y no contiene negaciones
+            if not sin_mejora and "no " not in user_lower:
+                mejora = any(phrase in user_lower for phrase in respuestas_mejora)
+            else:
+                mejora = False
+            
+            log_structured("debug", "streaming_evaluation_detection",
+                         request_id=request_id,
+                         user_text=user_lower[:50],
+                         sin_mejora=sin_mejora,
+                         mejora=mejora)
+            
             # 1. Detectar evaluación positiva (mejora)
-            if any(phrase in user_lower for phrase in ["me ayudó", "me siento mejor", "funcionó", "me sirvió", "mejoré"]):
+            if mejora:
                 # ✅ ÉXITO: Despedida y cierre
                 despedida = "¡Me alegra mucho que te haya servido! 🎉 Recuerda que puedes volver cuando necesites apoyo. ¡Sigue adelante!"
                 
@@ -1047,7 +1079,7 @@ async def handle_user_turn_streaming(
                 return
             
             # 2. Detectar evaluación negativa (sin mejora)
-            if any(phrase in user_lower for phrase in ["sigo igual", "no funcionó", "no me sirvió", "me siento peor", "no ayudó"]):
+            if sin_mejora:
                 # Incrementar contador de fallos
                 session.failed_attempts += 1
                 
