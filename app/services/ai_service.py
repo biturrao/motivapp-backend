@@ -17,8 +17,14 @@ import google.generativeai as genai
 
 from app.core.config import settings
 from app.schemas.chat import (
-    SessionStateSchema, Slots, EvalResult,
+    SessionStateSchema, Slots,
     Sentimiento, TipoTarea, Fase, Plazo, TiempoBloque
+)
+from app.services.strategies import (
+    obtener_ejemplos_estrategias,
+    seleccionar_estrategia,
+    EnfoqueRegulatorio,
+    NivelConstruccion
 )
 
 # Configurar structured logging para observabilidad
@@ -47,9 +53,16 @@ model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 # ---------------------------- PROMPT DE SISTEMA ---------------------------- #
 
-def get_system_prompt() -> str:
-    """Retorna el prompt de sistema completo para Flou"""
-    return f"""
+def get_system_prompt(enfoque: Optional[str] = None, nivel: Optional[str] = None) -> str:
+    """
+    Retorna el prompt de sistema completo para Flou con ejemplos contextuales.
+    
+    Args:
+        enfoque: 'promocion_eager' o 'prevencion_vigilant' (opcional)
+        nivel: '↑' o '↓' (opcional)
+    """
+    # Base del prompt
+    base_prompt = f"""
 Eres {AI_NAME}, una experta en Metamotivación que adapta su tono y consejos matemáticamente según el perfil del estudiante.
 
 ### TU CEREBRO (CÓMO PROCESAR LAS INSTRUCCIONES)
@@ -59,39 +72,75 @@ SI EL MODO ES "ENTUSIASTA" (Promotion Focus):
 - Tono: Enérgico, rápido, enfocado en avanzar y ganar.
 - Palabras clave: "Lograr", "Avanzar", "Ganar tiempo", "Genial".
 - Estrategia: Enfócate en la cantidad y la velocidad. Ignora los errores menores por ahora.
+- Ejemplos:
+  * Tareas creativas → "Escribe todas las ideas sin juzgar"
+  * Lluvia de ideas → "Cantidad sobre calidad, después filtramos"
+  * Borradores → "Avanza rápido, los errores se corrigen después"
 
 SI EL MODO ES "VIGILANTE" (Prevention Focus):
 - Tono: Calmado, cuidadoso, analítico, "Safety first".
 - Palabras clave: "Revisar", "Asegurar", "Precisión", "Correcto".
 - Estrategia: Enfócate en la calidad y en evitar errores. Ve lento pero seguro.
+- Ejemplos:
+  * Revisión → "Lee línea por línea, marca cada error"
+  * Tareas de precisión → "Checklist: verifica punto por punto"
+  * Detección errores → "Lee dos veces: corrido y al revés"
 
 SI EL NIVEL ES "ABSTRACTO" (Q3 Alto):
 - Explica el "POR QUÉ" y el propósito. Conecta con metas futuras.
 - No des pasos micro-detallados, da direcciones generales.
+- Ejemplos:
+  * "¿Por qué es importante esto para tu carrera?"
+  * "Visualiza cómo te sentirás al terminarlo"
+  * "Piensa en el impacto a largo plazo"
 
 SI EL NIVEL ES "CONCRETO" (Q3 Bajo):
 - Explica SOLO el "CÓMO". Ignora el propósito general.
 - Da instrucciones paso a paso, casi robóticas pero amables.
-- Ejemplo: "1. Abre el documento. 2. Lee el primer párrafo. 3. Corrige las comas."
+- Ejemplos:
+  * "1. Abre el documento. 2. Lee el primer párrafo. 3. Corrige las comas."
+  * "Paso 1: Timer de 10 min. Paso 2: Escribe sin parar. Paso 3: Guarda."
+
+### ESTRATEGIAS SEGÚN TASK-MOTIVATION FIT
+"""
+    
+    # Agregar ejemplos específicos si hay contexto
+    if enfoque and nivel:
+        try:
+            enfoque_enum = EnfoqueRegulatorio.PROMOCION_EAGER if enfoque == "promocion_eager" else EnfoqueRegulatorio.PREVENCION_VIGILANT
+            nivel_enum = NivelConstruccion.ABSTRACTO if nivel == "↑" else NivelConstruccion.CONCRETO
+            ejemplos = obtener_ejemplos_estrategias(enfoque_enum, nivel_enum)
+            base_prompt += ejemplos
+        except:
+            pass  # Si falla, continúa sin ejemplos contextuales
+    
+    base_prompt += """
 
 ### REGLAS DE ORO
 1. NUNCA menciones términos técnicos como "Promotion Focus" o "Q3". Actúa el rol, no lo expliques.
 2. Valida la emoción del usuario en la primera frase.
 3. Da UNA sola acción específica que quepa en el [TIEMPO DISPONIBLE].
 4. Si el usuario tiene "Ansiedad" o "Baja Autoeficacia", el MODO VIGILANTE + NIVEL CONCRETO es obligatorio (incluso si la instrucción dice otra cosa, prioriza reducir la ansiedad con pasos pequeños).
+5. Usa estrategias comprobadas del Task-Motivation Fit:
+   - Tareas creativas → Modo ENTUSIASTA
+   - Tareas de precisión/errores → Modo VIGILANTE
+   - Autocontrol/procrastinación → Nivel ABSTRACTO (conectar con propósito)
+   - Tareas técnicas/ejecución → Nivel CONCRETO (pasos específicos)
 
 ### FORMATO DE RESPUESTA
 1. Validación empática corta (1 frase).
 2. La Estrategia (adaptada al MODO y NIVEL indicados).
 3. Pregunta de cierre simple (¿Te parece bien? / ¿Le damos?).
 
-Mantén la respuesta bajo 75 palabras. Sé "Flou": cercana, chilena natural, usa emojis.
+Mantén la respuesta bajo 90 palabras. Sé "Flou": cercana, chilena natural, usa emojis.
 
 ### CRISIS
 Si detectas riesgo de suicidio, deriva al 4141 inmediatamente.
 
 RESPONDE SIEMPRE DE FORMA NATURAL Y CONVERSACIONAL.
 """
+    
+    return base_prompt
 
 
 # ---------------------------- DETECCIÓN DE CRISIS ---------------------------- #
@@ -397,6 +446,37 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         ]
         return welcome, session, quick_replies
     
+    # 2.5) Detectar si el usuario quiere reiniciar
+    if "reiniciar" in user_text.lower() or user_text.strip().lower() == "reiniciar conversación":
+        # Reset completo de la sesión
+        session.greeted = False
+        session.onboarding_complete = False
+        session.strategy_given = False
+        session.iteration = 0
+        session.failed_attempts = 0
+        session.Q2 = None
+        session.Q3 = None
+        session.enfoque = None
+        session.tiempo_bloque = None
+        session.sentimiento_inicial = None
+        session.sentimiento_actual = None
+        session.last_strategy = None
+        session.slots = Slots()
+        
+        restart_msg = "¡Perfecto! Empecemos de nuevo. 🔄\n\n¿Cómo está tu motivación hoy?"
+        quick_replies = [
+            {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
+            {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
+            {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
+            {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
+            {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
+            {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
+            {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
+        ]
+        
+        log_structured("info", "session_restart", request_id="non_streaming")
+        return restart_msg, session, quick_replies
+    
     # 3) Detectar si es solo un saludo casual
     casual_greetings = ["hola", "hey", "buenos días", "buenas tardes", "buenas noches", "qué tal", "saludos", "holi"]
     is_casual_greeting = any(greeting in user_text.lower().strip() for greeting in casual_greetings) and len(user_text.strip()) < 20
@@ -527,10 +607,10 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     session.sentimiento_actual = new_slots.sentimiento or session.sentimiento_actual
     
     # PRIMERO: Verificar si el usuario aceptó ir a bienestar (antes de otras detecciones)
-    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "DERIVAR_BIENESTAR" in user_text.upper():
+    if "quiero probar un ejercicio de bienestar" in user_text.lower() or "NAVIGATE_WELLNESS" in user_text.upper():
         session.iteration = 0  # Reset para cuando vuelva
         session.strategy_given = False
-        session.last_eval_result = EvalResult(fallos_consecutivos=0)
+        session.failed_attempts = 0
         reply = "Perfecto 😊 Voy a llevarte a la sección de Bienestar. Elige el ejercicio que más te llame la atención y tómate tu tiempo. Cuando termines, vuelve aquí y seguimos con tu tarea con energía renovada."
         quick_replies = [
             {"label": "🌿 Ir a Bienestar", "value": "NAVIGATE_WELLNESS"}
@@ -564,11 +644,20 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         
         # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida
         if mejora:
-            session.last_eval_result = EvalResult(fallos_consecutivos=0, cambio_sentimiento="↑")
+            # Reset completo de la sesión
             session.strategy_given = False
-            session.onboarding_complete = False  # Reset para próxima conversación
+            session.onboarding_complete = False
             session.iteration = 0
             session.greeted = False
+            session.failed_attempts = 0
+            session.Q2 = None
+            session.Q3 = None
+            session.enfoque = None
+            session.tiempo_bloque = None
+            session.sentimiento_inicial = None
+            session.sentimiento_actual = None
+            session.last_strategy = None
+            session.slots = Slots()
             
             reply = f"""¡Qué bueno escuchar eso! 😊 Me alegra mucho que te haya servido.
 
@@ -580,54 +669,67 @@ Recuerda que siempre puedes volver cuando necesites apoyo o una nueva estrategia
         
         # Si el usuario indica que NO mejoró, incrementar contador de fallos
         if sin_mejora:
-            fallos = session.last_eval_result.fallos_consecutivos if session.last_eval_result else 0
-            fallos += 1
-            session.last_eval_result = EvalResult(fallos_consecutivos=fallos, cambio_sentimiento="=")
+            session.failed_attempts += 1
+            
+            log_structured("info", "strategy_failure",
+                         failed_attempts=session.failed_attempts)
             
             # Verificar INMEDIATAMENTE si debe ofrecer bienestar (≥2 fallos)
-            if fallos >= 2:
-                reply = f"""Veo que hemos intentado un par de estrategias y todavía no te sientes mejor 😔
+            if session.failed_attempts >= 2:
+                reply = f"""Entiendo que las estrategias no han funcionado esta vez. 😔
 
-A veces lo que sentimos no es solo un tema de organización o método de estudio. El cuerpo y la mente necesitan un respiro antes de seguir intentando.
+A veces necesitamos un enfoque más profundo para gestionar emociones. Te sugiero explorar la **pestaña de Bienestar** donde encontrarás ejercicios de respiración, mindfulness y relajación que pueden ayudarte a resetear.
 
-¿Qué te parece si primero hacemos un ejercicio breve de bienestar? Hay algunos de respiración, relajación o mindfulness que pueden ayudarte a resetear.
-
-Solo toma 3-5 minutos y después volvemos con tu tarea. ¿Quieres probar?"""
+¿Te gustaría que te lleve allí ahora?"""
                 
                 quick_replies = [
-                    {"label": "✅ Sí, vamos a intentarlo", "value": "Sí, quiero probar un ejercicio de bienestar"},
-                    {"label": "🔄 No, sigamos con estrategias", "value": "No gracias, sigamos intentando con otras estrategias"}
+                    {"label": "🌿 Sí, ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
+                    {"label": "🔄 Reiniciar conversación", "value": "reiniciar"}
                 ]
                 
-                # Reset del contador para que no siga ofreciendo
-                session.last_eval_result = EvalResult(fallos_consecutivos=0)
-                session.strategy_given = False  # Permitir nueva estrategia
+                # Resetear flags pero mantener failed_attempts para tracking
+                session.strategy_given = False
+                session.onboarding_complete = False
+                
+                log_structured("info", "derivation_to_wellness", request_id="non_streaming")
                 
                 return reply, session, quick_replies
             
-            # Si fallos < 2: Recalibrar y generar nueva estrategia
-            logger.info(f"Recalibrando estrategia... (Fallo {fallos})")
-            
-            # 1. Cambiar Q3 (de ↑→↓ o viceversa)
-            if session.Q3 == "↑":
-                session.Q3 = "↓"
-            elif session.Q3 == "↓":
-                session.Q3 = "↑"
-            
-            # 2. Ajustar tamaño de tarea (hacerla más pequeña)
-            session.tiempo_bloque = 10
-            session.slots.tiempo_bloque = 10
-            logger.info(f"Nueva Q3: {session.Q3}, Nuevo tiempo: {session.tiempo_bloque}")
-            
-            # Marcar que NO hay estrategia dada para que genere una nueva
-            session.strategy_given = False
-            # Continuar el flujo para generar nueva estrategia (no hacer return aquí)
+            # Si fallos < 2: Recalibrar y generar nueva estrategia (primera falla = intento 1, segunda estrategia = intento 2)
+            if session.failed_attempts == 1:
+                logger.info(f"Recalibrando estrategia... (Fallo {session.failed_attempts})")
+                
+                # 1. Cambiar Q3 (de ↑→↓ o viceversa)
+                if session.Q3 == "↑":
+                    session.Q3 = "↓"
+                elif session.Q3 == "↓":
+                    session.Q3 = "↑"
+                
+                # 2. Ajustar tamaño de tarea (hacerla más pequeña)
+                session.tiempo_bloque = 10
+                session.slots.tiempo_bloque = 10
+                logger.info(f"Nueva Q3: {session.Q3}, Nuevo tiempo: {session.tiempo_bloque}")
+                
+                # Marcar que NO hay estrategia dada para que genere una nueva
+                session.strategy_given = False
+                # Continuar el flujo para generar nueva estrategia (no hacer return aquí)
+    
+    # Protección: Si ya fallaron 2 estrategias, NO generar más
+    if session.failed_attempts >= 2 and session.strategy_given:
+        log_structured("warning", "max_attempts_reached",
+                     failed_attempts=session.failed_attempts)
+        bienestar_fallback = "Ya intentamos varias estrategias. Te recomiendo explorar la **pestaña de Bienestar** para resetear. 🌿"
+        quick_replies = [
+            {"label": "🌿 Sí, ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
+            {"label": "🔄 Reiniciar conversación", "value": "reiniciar"}
+        ]
+        return bienestar_fallback, session, quick_replies
     
     # 7) Generar respuesta conversacional usando Gemini con historial
     try:
         llm_model = genai.GenerativeModel(
             model_name='gemini-2.0-flash-exp',
-            system_instruction=get_system_prompt()
+            system_instruction=get_system_prompt(enfoque=session.enfoque, nivel=session.Q3)
         )
         
         # Construir el historial de conversación para Gemini
@@ -748,6 +850,38 @@ async def handle_user_turn_streaming(
                 {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
             ]
             yield {"type": "complete", "data": {"text": welcome, "session": session, "quick_replies": quick_replies}}
+            return
+        
+        # 2.5) Detectar si el usuario quiere reiniciar
+        if "reiniciar" in user_text.lower() or user_text.strip().lower() == "reiniciar conversación":
+            # Reset completo de la sesión
+            session.greeted = False
+            session.onboarding_complete = False
+            session.strategy_given = False
+            session.iteration = 0
+            session.failed_attempts = 0
+            session.Q2 = None
+            session.Q3 = None
+            session.enfoque = None
+            session.tiempo_bloque = None
+            session.sentimiento_inicial = None
+            session.sentimiento_actual = None
+            session.last_strategy = None
+            session.slots = Slots()
+            
+            restart_msg = "¡Perfecto! Empecemos de nuevo. 🔄\n\n¿Cómo está tu motivación hoy?"
+            quick_replies = [
+                {"label": "😑 Aburrido/a", "value": "Estoy aburrido"},
+                {"label": "😤 Frustrado/a", "value": "Estoy frustrado"},
+                {"label": "😰 Ansioso/a", "value": "Estoy ansioso"},
+                {"label": "🌀 Distraído/a", "value": "Estoy distraído"},
+                {"label": "😔 Desmotivado/a", "value": "Estoy desmotivado"},
+                {"label": "😕 Inseguro/a", "value": "Me siento inseguro"},
+                {"label": "😩 Abrumado/a", "value": "Me siento abrumado"},
+            ]
+            
+            log_structured("info", "session_restart_streaming", request_id=request_id)
+            yield {"type": "complete", "data": {"text": restart_msg, "session": session, "quick_replies": quick_replies}}
             return
         
         # 3) Detectar si es solo un saludo casual
@@ -888,8 +1022,9 @@ async def handle_user_turn_streaming(
                 session.onboarding_complete = False
                 session.strategy_given = False
                 session.iteration = 0
-                session.Q2 = 0.0
-                session.Q3 = 0.0
+                session.failed_attempts = 0
+                session.Q2 = None
+                session.Q3 = None
                 session.enfoque = None
                 session.tiempo_bloque = None
                 session.sentimiento_inicial = None
@@ -904,45 +1039,74 @@ async def handle_user_turn_streaming(
             # 2. Detectar evaluación negativa (sin mejora)
             if any(phrase in user_lower for phrase in ["sigo igual", "no funcionó", "no me sirvió", "me siento peor", "no ayudó"]):
                 # Incrementar contador de fallos
-                if not hasattr(session, 'failed_attempts'):
-                    session.failed_attempts = 0
                 session.failed_attempts += 1
                 
                 log_structured("info", "strategy_failure_streaming",
                              request_id=request_id,
                              failed_attempts=session.failed_attempts)
                 
-                # Si ya intentamos 2 veces, derivar a bienestar
+                # Si ya intentamos 2 veces (primera estrategia + 1 recalibración), derivar a bienestar
                 if session.failed_attempts >= 2:
                     bienestar_msg = (
-                        "Entiendo que las estrategias no han funcionado esta vez. "
-                        "A veces necesitamos un enfoque más profundo. Te sugiero explorar la **pestaña de Bienestar** "
-                        "donde encontrarás recursos para gestionar emociones y recuperar tu energía. "
+                        "Entiendo que las estrategias no han funcionado esta vez. 😔\n\n"
+                        "A veces necesitamos un enfoque más profundo para gestionar emociones. "
+                        "Te sugiero explorar la **pestaña de Bienestar** donde encontrarás ejercicios de respiración, "
+                        "mindfulness y relajación que pueden ayudarte a resetear.\n\n"
                         "¿Te gustaría que te lleve allí ahora?"
                     )
                     quick_replies = [
-                        {"label": "Sí, ir a Bienestar", "value": "ir a bienestar", "navigate_to": "wellness"},
-                        {"label": "Prefiero intentar otra cosa", "value": "intentar otra estrategia"}
+                        {"label": "🌿 Sí, ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
+                        {"label": "🔄 Reiniciar conversación", "value": "reiniciar"}
                     ]
                     
-                    # Resetear para que si vuelve, empiece de cero
+                    # Resetear flags pero mantener failed_attempts para tracking
                     session.strategy_given = False
-                    session.failed_attempts = 0
+                    session.onboarding_complete = False
                     
+                    log_structured("info", "derivation_to_wellness_streaming", request_id=request_id)
                     yield {"type": "complete", "data": {"text": bienestar_msg, "session": session, "quick_replies": quick_replies}}
                     return
                 
-                # Primer o segundo fallo: recalibrar y generar nueva estrategia
-                recal_msg = (
-                    "Entiendo, esa estrategia no te ayudó. Voy a recalibrar y proponerte un enfoque diferente. "
-                    "Dame un momento..."
-                )
-                yield {"type": "chunk", "data": {"text": recal_msg}}
-                
-                # Resetear flag para generar nueva estrategia
-                session.strategy_given = False
-                # NO resetear onboarding_complete, conservar los slots
-                # Continuar al flujo de generación...
+                # Primera falla: recalibrar parámetros y generar nueva estrategia
+                else:
+                    recal_msg = (
+                        "Entiendo, esa estrategia no te ayudó. 💭\n\n"
+                        "Voy a ajustar el enfoque y proponerte algo diferente que puede funcionar mejor para ti."
+                    )
+                    
+                    # Cambiar Q3 para recalibración (de abstracto a concreto o viceversa)
+                    if session.Q3 == "↑":
+                        session.Q3 = "↓"
+                    elif session.Q3 == "↓":
+                        session.Q3 = "↑"
+                    
+                    # Acortar tiempo de bloque para que sea más manejable
+                    if session.tiempo_bloque and session.tiempo_bloque > 10:
+                        session.tiempo_bloque = 10
+                    
+                    # Resetear flag para generar nueva estrategia
+                    session.strategy_given = False
+                    
+                    log_structured("info", "strategy_recalibration_streaming",
+                                 request_id=request_id,
+                                 new_Q3=session.Q3,
+                                 new_tiempo=session.tiempo_bloque)
+                    
+                    # Enviar mensaje de recalibración y continuar al flujo de generación
+                    yield {"type": "chunk", "data": {"text": recal_msg + "\n\n"}}
+        
+        # Protección: Si ya fallaron 2 estrategias y de alguna forma llegamos aquí, NO generar más
+        if session.failed_attempts >= 2 and session.strategy_given:
+            log_structured("warning", "max_attempts_reached_streaming", 
+                         request_id=request_id,
+                         failed_attempts=session.failed_attempts)
+            bienestar_fallback = "Ya intentamos varias estrategias. Te recomiendo explorar la **pestaña de Bienestar** para resetear. 🌿"
+            quick_replies = [
+                {"label": "🌿 Sí, ir a Bienestar", "value": "NAVIGATE_WELLNESS"},
+                {"label": "🔄 Reiniciar conversación", "value": "reiniciar"}
+            ]
+            yield {"type": "complete", "data": {"text": bienestar_fallback, "session": session, "quick_replies": quick_replies}}
+            return
         
         # 6) Inferir Q2, Q3, enfoque
         Q2, Q3, enfoque = infer_q2_q3(session.slots)
@@ -974,7 +1138,7 @@ async def handle_user_turn_streaming(
         # 7) Generar respuesta con STREAMING
         llm_model = genai.GenerativeModel(
             model_name='gemini-2.0-flash-exp',
-            system_instruction=get_system_prompt()
+            system_instruction=get_system_prompt(enfoque=session.enfoque, nivel=session.Q3)
         )
         
         # Construir historial

@@ -51,13 +51,6 @@ class Slots(BaseModel):
     tiempo_bloque: Optional[TiempoBloque] = None
 
 
-class EvalResult(BaseModel):
-    """Resultado de la evaluación de un bloque"""
-    exito: Optional[bool] = None
-    cambio_sentimiento: Optional[Literal["↑", "=", "↓"]] = None
-    fallos_consecutivos: Optional[int] = 0  # Contador para derivación a bienestar
-
-
 class SessionStateSchema(BaseModel):
     """Estado de la sesión metamotivacional"""
     greeted: bool = False
@@ -72,7 +65,7 @@ class SessionStateSchema(BaseModel):
     enfoque: Optional[Literal["promocion_eager", "prevencion_vigilant"]] = None
     tiempo_bloque: Optional[TiempoBloque] = None
     last_strategy: Optional[str] = None
-    last_eval_result: Optional[EvalResult] = None
+    failed_attempts: int = 0  # Contador de estrategias fallidas consecutivas
 
 
 # ---------------------------- Mensajes de Chat ----------------------------
