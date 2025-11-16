@@ -1239,7 +1239,6 @@ async def handle_user_turn_streaming(
             {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
             {"label": "❌ No funcionó", "value": "no funcionó"}
         ]
-        ]
         
         latency = (time.time() - start_time) * 1000
         log_structured("info", "streaming_request_complete",
