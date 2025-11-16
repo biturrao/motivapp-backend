@@ -381,8 +381,7 @@ async def get_chat_history(
                     # Es una estrategia normal, mostrar opciones de evaluación
                     quick_replies = [
                         {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
-                        {"label": "😐 Sigo igual", "value": "sigo igual"},
-                        {"label": "😟 Me siento peor", "value": "no funcionó"}
+                        {"label": "❌ No funcionó", "value": "no funcionó"}
                     ]
             
             # Agregar quick_replies al último mensaje si existen

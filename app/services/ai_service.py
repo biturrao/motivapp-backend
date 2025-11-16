@@ -621,27 +621,37 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
     # SEGUNDO: Si ya se dio una estrategia, esperar evaluación del usuario
     if session.strategy_given:
         # Detectar respuestas de evaluación del usuario
+        user_text_lower = user_text.lower().strip()
+        
         # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
         respuestas_sin_mejora = [
             "no funcionó", "no funciono", "no me funcionó", "no me ayudó", "no me ayudo",
             "sigo igual", "estoy igual", "igual que antes",
-            "peor", "me siento peor", "estoy peor", "más mal", "me siento peor",
+            "peor", "me siento peor", "estoy peor", "más mal",
             "no mejoró", "no mejoro", "no ayudó", "no ayudo", 
-            "no sirvió", "no sirvio"
+            "no sirvió", "no sirvio", "no sirve"
         ]
         respuestas_mejora = [
             "me ayudó", "me ayudo", "sí me ayudó", "si me ayudo",
             "funcionó bien", "funciono bien", "sí funcionó", "si funciono",
-            "mejor", "me siento mejor", "estoy mejor", "mucho mejor",
+            "me siento mejor", "estoy mejor", "mucho mejor",
             "bien", "muy bien", "genial", "excelente", "perfecto"
         ]
         
-        user_text_lower = user_text.lower().strip()
-        
-        # Verificar sin_mejora PRIMERO (tiene frases más específicas con "no")
+        # Verificar sin_mejora PRIMERO (más específico)
         sin_mejora = any(frase in user_text_lower for frase in respuestas_sin_mejora)
-        # Solo verificar mejora si NO detectó sin_mejora (para evitar conflictos)
-        mejora = False if sin_mejora else any(frase in user_text_lower for frase in respuestas_mejora)
+        
+        # Solo verificar mejora si NO es sin_mejora
+        if not sin_mejora:
+            mejora = any(frase in user_text_lower for frase in respuestas_mejora)
+        else:
+            mejora = False
+        
+        # Log para debugging
+        log_structured("debug", "evaluation_detection",
+                     user_text=user_text_lower[:50],
+                     sin_mejora=sin_mejora,
+                     mejora=mejora)
         
         # Si el usuario indica que MEJORÓ, cerrar con mensaje de despedida
         if mejora:
@@ -798,6 +808,9 @@ A veces necesitamos un enfoque más profundo para gestionar emociones. Te sugier
     
     # Siempre dar quick replies de evaluación después de una estrategia
     quick_replies = [
+        {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
+        {"label": "❌ No funcionó", "value": "no funcionó"}
+    ]
         {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
         {"label": "😐 Sigo igual", "value": "sigo igual"},
         {"label": "😟 Me siento peor", "value": "no funcionó"}
@@ -1228,8 +1241,8 @@ async def handle_user_turn_streaming(
         # Siempre dar quick replies de evaluación después de una estrategia
         quick_replies = [
             {"label": "✅ Me ayudó, me siento mejor", "value": "me ayudó"},
-            {"label": "😐 Sigo igual", "value": "sigo igual"},
-            {"label": "😟 Me siento peor", "value": "no funcionó"}
+            {"label": "❌ No funcionó", "value": "no funcionó"}
+        ]
         ]
         
         latency = (time.time() - start_time) * 1000
