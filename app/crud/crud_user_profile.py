@@ -40,6 +40,9 @@ def update_profile(
     for field, value in update_data.items():
         setattr(db_obj, field, value)
 
+    # Invalidar el resumen de IA al actualizar el perfil
+    db_obj.summary = None
+
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)

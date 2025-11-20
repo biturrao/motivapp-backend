@@ -32,6 +32,9 @@ class UserProfile(Base):
     neurodivergence: Optional[str] = Column(String, nullable=True)
     neurodivergence_details: Optional[str] = Column(String, nullable=True)
     preferred_support_types: Optional[str] = Column(String, nullable=True)
+    
+    # Cache del resumen generado por IA
+    summary: Optional[str] = Column(String, nullable=True)
 
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     owner = relationship("User", back_populates="profile")
