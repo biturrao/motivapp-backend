@@ -443,10 +443,6 @@ async def get_profile_summary(
         if not profile:
             raise HTTPException(status_code=404, detail="Perfil no encontrado")
         
-        # Verificar si ya existe un resumen en caché
-        if profile.summary:
-            return ProfileSummaryResponse(summary=profile.summary)
-        
         # Convertir el perfil a diccionario
         profile_dict = {
             "name": profile.name,
@@ -468,11 +464,6 @@ async def get_profile_summary(
         
         # Generar el resumen
         summary = await generate_profile_summary(profile_dict)
-        
-        # Guardar el resumen en la base de datos
-        profile.summary = summary
-        db.add(profile)
-        db.commit()
         
         return ProfileSummaryResponse(summary=summary)
         
