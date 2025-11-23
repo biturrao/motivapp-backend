@@ -1,8 +1,11 @@
 # mot_back/app/main.py
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import logging
 
 from app.db.base import Base 
@@ -23,6 +26,10 @@ from app.api.v1.endpoints import feedback as feedback_endpoints
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Configurar Rate Limiter
+# Usa la IP del cliente para identificar usuarios
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,14 +60,18 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
+# Agregar limiter al estado de la app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configuración CORS para Azure
-# Ajusta los orígenes según tus necesidades
+# Para apps nativas (APK), no necesitamos dominios específicos
+# Solo mantenemos localhost para desarrollo local con Expo
 origins = [
-    "http://localhost:8081",  # Expo local
-    "http://localhost:19006",  # Expo web
-    "https://motivapp-api-h3eke6d2endmftfb.brazilsouth-01.azurewebsites.net",  # Tu backend Azure
-    "https://*.azurewebsites.net",  # Otros servicios Azure
-    "*",  # En producción, reemplaza esto con tu dominio específico del frontend
+    "http://localhost:8081",  # Expo local (desarrollo)
+    "http://localhost:19006",  # Expo web (desarrollo)
+    # Las apps nativas (APK) no necesitan estar en esta lista
+    # porque no tienen "origin" como los navegadores web
 ]
 
 app.add_middleware(

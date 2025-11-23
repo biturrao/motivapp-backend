@@ -1,9 +1,11 @@
 # app/api/v1/endpoints/ai_chat.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import logging
 import json
 
@@ -21,6 +23,9 @@ from app.crud.crud_daily_check_in import get_latest_checkin
 from app.crud.crud_dashboard import get_questionnaire_summary
 
 logger = logging.getLogger(__name__)
+
+# Configurar limiter (se obtiene del app.state en main.py)
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -84,8 +89,10 @@ def build_user_context(db: Session, user: User) -> str:
 
 
 @router.post("/send", response_model=ChatResponse)
+@limiter.limit("50/minute")  # Máximo 50 mensajes por minuto por usuario
 async def send_message(
     request: ChatRequest,
+    http_request: Request,  # Necesario para slowapi
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -156,8 +163,10 @@ async def send_message(
 
 
 @router.post("/send-stream")
+@limiter.limit("30/minute")  # Más restrictivo para streaming (consume más recursos)
 async def send_message_stream(
     request: ChatRequest,
+    http_request: Request,  # Necesario para slowapi
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
