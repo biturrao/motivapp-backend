@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, desc
 from datetime import datetime, timedelta
 import random
 
@@ -83,18 +83,41 @@ def get_random_exercise_for_user(
     energy_state: str
 ) -> Optional[WellnessExercise]:
     """
-    Obtener un ejercicio aleatorio para el usuario que no haya completado hoy
+    Obtener el siguiente ejercicio en la secuencia para el usuario.
+    Ciclo: 1 -> 2 -> 3 -> 1
     """
-    available = get_available_exercises_for_user(db, user_id, energy_state, exclude_today=True)
-    
-    if not available:
-        # Si ya completó todos, devolver uno aleatorio sin restricción
-        available = get_exercises_by_state(db, energy_state)
-    
-    if not available:
+    # 1. Obtener todos los ejercicios válidos para el estado
+    valid_exercises = get_exercises_by_state(db, energy_state)
+    if not valid_exercises:
         return None
+        
+    # Ordenar por ID para asegurar orden consistente
+    valid_exercises.sort(key=lambda x: x.id)
     
-    return random.choice(available)
+    # 2. Buscar la última completación que coincida con alguno de la lista
+    valid_ids = [ex.id for ex in valid_exercises]
+    last_matching_completion = db.query(ExerciseCompletion).filter(
+        and_(
+            ExerciseCompletion.user_id == user_id,
+            ExerciseCompletion.exercise_id.in_(valid_ids)
+        )
+    ).order_by(desc(ExerciseCompletion.started_at)).first()
+    
+    if last_matching_completion:
+        # Encontrar el índice del último ejercicio
+        try:
+            last_index = next(
+                i for i, ex in enumerate(valid_exercises) 
+                if ex.id == last_matching_completion.exercise_id
+            )
+            # Devolver el siguiente (circular)
+            return valid_exercises[(last_index + 1) % len(valid_exercises)]
+        except StopIteration:
+            # Fallback por si acaso
+            return valid_exercises[0]
+            
+    # Si no ha hecho ninguno de esta lista, devolver el primero
+    return valid_exercises[0]
 
 
 def create_exercise(db: Session, exercise: WellnessExerciseCreate) -> WellnessExercise:

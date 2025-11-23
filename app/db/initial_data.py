@@ -285,12 +285,6 @@ def seed_wellness_exercises(db: Session):
     """
     logger.info("Sembrando ejercicios de bienestar...")
     
-    # Check if exercises already exist
-    existing_exercise = db.query(WellnessExercise).first()
-    if existing_exercise:
-        logger.info("Los ejercicios de bienestar ya existen. Saltando siembra.")
-        return
-    
     exercises_data = [
         {
             "name": "Pasos que Exhalan",
@@ -432,12 +426,21 @@ def seed_wellness_exercises(db: Session):
     }
     ]
     
+    added_count = 0
     for exercise_data in exercises_data:
-        exercise = WellnessExercise(**exercise_data)
-        db.add(exercise)
+        # Check if exercise exists by name
+        existing = db.query(WellnessExercise).filter(WellnessExercise.name == exercise_data["name"]).first()
+        if not existing:
+            exercise = WellnessExercise(**exercise_data)
+            db.add(exercise)
+            added_count += 1
+            logger.info(f"Agregando nuevo ejercicio: {exercise_data['name']}")
     
-    db.commit()
-    logger.info(f"Sembraron {len(exercises_data)} ejercicios de bienestar exitosamente.")
+    if added_count > 0:
+        db.commit()
+        logger.info(f"Se agregaron {added_count} nuevos ejercicios de bienestar.")
+    else:
+        logger.info("Todos los ejercicios ya existen.")
 
 
 
