@@ -31,3 +31,15 @@ engine = create_engine(
 
 # Creamos una clase SessionLocal, cada instancia de esta clase será una sesión de base de datos
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependencia para obtener la sesión de base de datos
+def get_db():
+    """
+    Generador que proporciona una sesión de base de datos.
+    Se usa como dependencia en los endpoints de FastAPI.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
