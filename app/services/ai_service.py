@@ -805,7 +805,7 @@ A veces necesitamos un enfoque más profundo para gestionar emociones. Te sugier
         response = chat.send_message(
             full_message,
             generation_config=genai.types.GenerationConfig(
-                temperature=0.8,
+                temperature=1,
                 max_output_tokens=400,  # Aumentado para dar mejores explicaciones
                 top_p=0.95
             )
