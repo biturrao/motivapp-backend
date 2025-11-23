@@ -363,6 +363,73 @@ def seed_wellness_exercises(db: Session):
             "ux_notes": "Círculo de progreso con tres segmentos corporales; voz cálida; ilustración de silueta",
             "safeguards": "Permitir saltar zonas si hay incomodidad"
         },
+        {
+        "name": "5-4-3-2-1 + Puente",
+        "objective": "Grounding multisensorial y enfoque amable hacia la siguiente acción",
+        "context": "Sentado/Quieto",
+        "duration_seconds": 120,
+        "recommended_state": ExerciseState.AMBAR,
+        "taxonomy": "Exteroceptive grounding; mindful noticing",
+        "body_systems": "Visión, audición, tacto/propiocepción, olfato/gusto",
+        "steps": json.dumps([
+            "Nombra 5 cosas que ves, 4 que oyes, 3 que tocas",
+            "Identifica 2 olores/sabores presentes o recordados",
+            "Formula 1 pensamiento/acto de cuidado o siguiente paso",
+            "Respira lento y confirma"
+        ]),
+        "voice_scripts": json.dumps([
+            "El objetivo de este ejercicio es sacarte del ruido mental y traerte de vuelta al presente usando tus cinco sentidos. Al terminar, conectaremos esta calma con una acción concreta y amable para tu siguiente tarea. ¿Te parece si lo realizamos? Si es así, presiona el botón de abajo.",
+            "Bien. Si puedes, levanta la vista de la pantalla. Respira hondo una vez. Vamos a conectar con lo que te rodea. Primero, la vista. Mira a tu alrededor y nombra mentalmente cinco cosas que puedas ver. Fíjate en los colores, las sombras o las texturas... Ahora, el oído. Cierra los ojos o baja la mirada. Encuentra cuatro sonidos. Pueden ser ruidos lejanos en la calle, o el zumbido de tu computador. Escúchalos... Vamos al tacto. Nota tres sensaciones físicas ahora mismo. El peso de tu cuerpo en la silla, la ropa sobre tu piel, o la temperatura del aire... Ahora, el olfato o el gusto. Identifica dos olores o sabores. Si no hueles nada, trae a tu memoria un aroma que te guste, como café recién hecho o tierra mojada. Finalmente, uno. Formula un pensamiento amable o define tu próximo paso. ¿Qué es lo siguiente que harás por ti? Defínelo con claridad. Inhala profundo, sellando esa intención. Ya estás de vuelta. Lleva esta claridad a tu siguiente acción. Has terminado."
+        ]),
+        "measurement_notes": "Valencia y activación pre/post; cumplimiento del 'puente'",
+        "ux_notes": "Iconos de sentidos que se iluminan secuencialmente; cuenta atrás visual lenta para cada sentido.",
+        "safeguards": "Modo oscuro o sin estímulos fuertes si hay sensibilidad sensorial"    
+        },
+        {
+        "name": "Postura-Objetivo Snap",
+        "objective": "Alineación rápida de postura e intención para recuperar enfoque",
+        "context": "Sentado/Escritorio",
+        "duration_seconds": 45,
+        "recommended_state": ExerciseState.VERDE,
+        "taxonomy": "Embodied goal priming; regulación postural; autoeficacia",
+        "body_systems": "Columna; mandíbula; respiración diafragmática",
+        "steps": json.dumps([
+            "Ajusta la postura: pies firmes, columna erguida",
+            "Libera conscientemente la tensión de la mandíbula",
+            "Define una frase corta con tu objetivo inmediato",
+            "Exhala con fuerza suave mientras dices o piensas tu frase"
+        ]),
+        "voice_scripts": json.dumps([
+            "A veces, la falta de motivación es simplemente una mala postura. El objetivo de este ejercicio es hacer un reinicio rápido de 30 segundos. Alinearemos tu columna y soltaremos la tensión de la mandíbula para enviarle una señal inmediata de seguridad y claridad a tu cerebro antes de tu siguiente tarea. ¿Te parece si lo realizamos? Si es así, presiona el botón de abajo.",
+            "Bien, hagamos este ajuste rápido. Si estás sentado, descruza las piernas y apoya los pies firmes en el suelo. Imagina que un hilo tira de tu coronilla hacia el techo. Estira la columna, pero baja los hombros. Ahora, lo más importante: suelta la mandíbula. Deja que haya un pequeño espacio entre tus dientes. Nota cómo se relaja tu cara. Desde esta postura de dignidad y fuerza, piensa en lo próximo que vas a hacer. Defínelo en una frase corta, como: Voy a terminar este resumen o Estoy listo para concentrarme. Inhala profundo por la nariz, llenando tu espalda recta... Y al exhalar, di esa frase en tu mente o en voz baja, con firmeza. Siente cómo tu cuerpo respalda tu intención. Has terminado. Vuelve a tu tarea."
+        ]),
+        "measurement_notes": "Autoeficacia 0-10 pre/post; registro de si se completó la frase",
+        "ux_notes": "Vibración háptica breve al momento de la exhalación/frase; campo de texto opcional para escribir la meta; círculo de 45s",
+        "safeguards": "Si hay dolor de espalda, ajustar a una postura cómoda sin forzar"
+    },
+    {
+        "name": "Mmmh",
+        "objective": "Calmar mediante vibración suave y exhalación prolongada",
+        "context": "Sentado/Privado",
+        "duration_seconds": 60,
+        "recommended_state": ExerciseState.ROJO,
+        "taxonomy": "Humming breath; regulación vagal; atención a vibración",
+        "body_systems": "Laringe, cavidad oral, caja torácica",
+        "steps": json.dumps([
+            "Inhala nasal suavemente durante 3-4 segundos",
+            "Exhala haciendo un sonido de zumbido (Mmm) de 5-6 segundos",
+            "Siente la vibración en los labios, pecho y cara",
+            "Repite durante 5 ciclos",
+            "Nota si la vibración relaja tu tensión interna"
+        ]),
+        "voice_scripts": json.dumps([
+            "El objetivo de este ejercicio es calmar tu sistema nervioso usando tu propia voz. La vibración suave del tarareo actúa como un masaje interno que relaja el pecho y la garganta. ¿Te parece si lo realizamos? Si es así, presiona el botón de abajo.",
+            "Bien. Siéntate cómodamente con la espalda recta pero relajada. Vamos a inhalar por la nariz y al exhalar haremos un sonido de zumbido con los labios cerrados. Inhala suavemente... dos, tres, cuatro. Y exhala haciendo vibrar tus labios: mhmmhmhmhmmhmhmhmh... Siente esa vibración en tu boca y pecho. Hagámoslo de nuevo. Inhala profundo. Exhala con sonido: mhmmhmhmhmmhmhmhmh... Deja que el sonido salga natural, sin forzar. Una vez más. Inhala... Exhala vibrando: mhmmhmhmhmmhmhmhmh... Nota cómo esa pequeña vibración afloja la tensión interna. Haz un último ciclo a tu ritmo. Has terminado."
+        ]),
+        "measurement_notes": "Localización de vibración (labios/pecho/cara); activación pre/post",
+        "ux_notes": "Temporizador por ciclos dentro de un anillo; opción de silencio si en público; visualización de ondas de sonido suaves",
+        "safeguards": "Evitar si hay dolor de garganta agudo o incomodidad al hacer ruido"
+    }
     ]
     
     for exercise_data in exercises_data:
