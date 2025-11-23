@@ -307,6 +307,22 @@ def guess_ramo(text: str) -> Optional[str]:
     return None
 
 
+def guess_tiempo_bloque(text: str) -> Optional[int]:
+    """Extrae tiempo de bloque del texto usando heurística"""
+    text_lower = text.lower()
+    if re.search(r'10|diez', text_lower):
+        return 10
+    if re.search(r'12|doce', text_lower):
+        return 12
+    if re.search(r'15|quince', text_lower):
+        return 15
+    if re.search(r'25|veinticinco', text_lower):
+        return 25
+    if re.search(r'45|cuarenta y cinco', text_lower):
+        return 45
+    return None
+
+
 # ---------------------------- EXTRACCIÓN CON LLM ---------------------------- #
 
 async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
@@ -375,7 +391,7 @@ def extract_slots_heuristic(free_text: str, current_slots: Slots) -> Slots:
         ramo=guess_ramo(free_text) or current_slots.ramo,
         plazo=guess_plazo(free_text) or current_slots.plazo,
         fase=guess_fase(free_text) or current_slots.fase,
-        tiempo_bloque=current_slots.tiempo_bloque or 12
+        tiempo_bloque=guess_tiempo_bloque(free_text) or current_slots.tiempo_bloque or 12
     )
 
 
@@ -625,7 +641,7 @@ async def handle_user_turn(session: SessionStateSchema, user_text: str, context:
         
         # IMPORTANTE: Verificar frases negativas PRIMERO (más específicas)
         respuestas_sin_mejora = [
-            "no funcionó", "no funciono", "no me funcionó", "no me funcionó", "no funciona",
+            "no funcionó", "no me funcionó", "no funciona",
             "no me ayudó", "no me ayudo", "no ayuda",
             "sigo igual", "estoy igual", "igual que antes",
             "peor", "me siento peor", "estoy peor", "más mal",
@@ -1026,11 +1042,12 @@ async def handle_user_turn_streaming(
             
             # Definir frases de evaluación (NEGATIVAS PRIMERO)
             respuestas_sin_mejora = [
-                "no funcionó", "no funciono", "no me funcionó", "no me funcionó", "no funciona",
+                "no funcionó", "no me funcionó", "no funciona",
                 "no me ayudó", "no me ayudo", "no ayuda",
                 "sigo igual", "estoy igual", "igual que antes",
                 "peor", "me siento peor", "estoy peor", "más mal",
-                "no mejoró", "no mejoro", "no sirvió", "no sirvio", "no sirve"
+                "no mejoró", "no mejoro", "no ayudó", "no ayudo", 
+                "no sirvió", "no sirvio", "no sirve"
             ]
             
             respuestas_mejora = [
@@ -1371,4 +1388,80 @@ Basado en los siguientes datos del perfil en formato JSON, crea un resumen que d
     except Exception as error:
         logger.error(f"Error al generar el resumen del perfil: {error}")
         return ""
+
+async def generate_checkin_feedback(current_level: int, previous_level: Optional[int]) -> Dict[str, Optional[str]]:
+    """
+    Genera feedback motivacional basado en el cambio de nivel de motivación.
+    Retorna un dict con 'message' y 'action' (opcional).
+    """
+    action = None
+    prompt_type = "neutral"
+    
+    # Definir niveles "malos" (1: Ansioso, 2: Frustrado, 3: Aburrido)
+    is_bad = current_level <= 3
+    
+    if previous_level is None:
+        if is_bad:
+            prompt_type = "support_wellness"
+            action = "wellness"
+        else:
+            prompt_type = "welcome"
+    else:
+        if current_level < previous_level:
+            # Bajó la motivación -> Apoyo + Bienestar
+            prompt_type = "support_wellness_worse"
+            action = "wellness"
+        elif current_level > previous_level:
+            # Subió la motivación -> Alegría
+            prompt_type = "celebration"
+        elif current_level == previous_level:
+            if is_bad:
+                # Se mantuvo mal -> Apoyo + Bienestar
+                prompt_type = "support_wellness_same_bad"
+                action = "wellness"
+            else:
+                # Se mantuvo bien/neutral
+                prompt_type = "maintenance"
+
+    try:
+        llm_model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        system_prompt = f"""Eres {AI_NAME}, una IA motivacional empática.
+Genera un mensaje corto (máximo 2 frases) para el usuario después de su check-in diario.
+Usa emojis. Sé cercana y chilena natural.
+
+Contexto:
+- Nivel actual: {current_level}/6
+- Nivel anterior: {previous_level if previous_level else 'N/A'}/6
+- Situación: {prompt_type}
+
+Instrucciones según situación:
+- support_wellness / support_wellness_worse / support_wellness_same_bad: Mensaje de apoyo cálido, validando que está bien no estar bien. Sugiere suavemente ir a bienestar.
+- celebration: Mensaje de alegría y felicitación por la mejora.
+- welcome: Bienvenida positiva al primer check-in.
+- maintenance: Mensaje de ánimo para seguir así.
+
+Mensaje:"""
+
+        response = llm_model.generate_content(
+            system_prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=100
+            )
+        )
+        
+        message = response.text.strip()
+        
+    except Exception as e:
+        logger.error(f"Error generando feedback check-in: {e}")
+        # Fallbacks
+        if action == "wellness":
+            message = "Siento que hoy sea difícil. 💙 Recuerda que estoy aquí para apoyarte. ¿Te gustaría probar un ejercicio de bienestar?"
+        elif prompt_type == "celebration":
+            message = "¡Qué alegría ver que te sientes mejor! 🚀 ¡Sigue así!"
+        else:
+            message = "Gracias por tu check-in. ¡Vamos por un buen día! ✨"
+
+    return {"message": message, "action": action}
 

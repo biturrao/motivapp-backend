@@ -1,4 +1,5 @@
 from .user import User
+from .user_profile import UserProfile
 from .section import Section
 from .question import Question
 from .answer import Answer
