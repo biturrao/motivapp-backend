@@ -35,7 +35,7 @@ Fase = Literal["ideacion", "planificacion", "ejecucion", "revision"]
 
 Plazo = Literal["hoy", "<24h", "esta_semana", ">1_semana"]
 
-TiempoBloque = Literal[10, 12, 15, 25]
+TiempoBloque = Literal[10, 12, 15, 20, 25, 30, 45, 60, 90]
 
 
 # ---------------------------- Slots y SessionState ----------------------------

@@ -323,7 +323,7 @@ async def extract_slots_with_llm(free_text: str, current_slots: Slots) -> Slots:
 - ramo: nombre del ramo/materia
 - plazo: hoy|<24h|esta_semana|>1_semana
 - fase: ideacion|planificacion|ejecucion|revision
-- tiempo_bloque: 10|12|15|25
+- tiempo_bloque: 10|12|15|20|25|30|45|60|90
 
 Si un campo no aparece, usa null. Responde SOLO con JSON válido, sin texto adicional."""
 
