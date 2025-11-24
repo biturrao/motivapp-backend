@@ -91,8 +91,8 @@ def build_user_context(db: Session, user: User) -> str:
 @router.post("/send", response_model=ChatResponse)
 @limiter.limit("50/minute")  # Máximo 50 mensajes por minuto por usuario
 async def send_message(
-    request: ChatRequest,
-    http_request: Request,  # Necesario para slowapi
+    chat_request: ChatRequest,
+    request: Request,  # Necesario para slowapi y debe llamarse 'request'
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -109,7 +109,7 @@ async def send_message(
             db=db,
             user_id=current_user.id,
             role='user',
-            text=request.message
+            text=chat_request.message
         )
         
         # Obtener o crear sesión metamotivacional
@@ -129,7 +129,7 @@ async def send_message(
         # Procesar con el orquestador metamotivacional
         ai_response_text, updated_session, quick_replies = await handle_user_turn(
             session=session_schema,
-            user_text=request.message,
+            user_text=chat_request.message,
             context=context,
             chat_history=chat_history
         )
@@ -165,8 +165,8 @@ async def send_message(
 @router.post("/send-stream")
 @limiter.limit("30/minute")  # Más restrictivo para streaming (consume más recursos)
 async def send_message_stream(
-    request: ChatRequest,
-    http_request: Request,  # Necesario para slowapi
+    chat_request: ChatRequest,
+    request: Request,  # Necesario para slowapi y debe llamarse 'request'
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -188,7 +188,7 @@ async def send_message_stream(
             db=db,
             user_id=current_user.id,
             role='user',
-            text=request.message
+            text=chat_request.message
         )
         
         # Obtener o crear sesión metamotivacional
@@ -214,7 +214,7 @@ async def send_message_stream(
             try:
                 async for event in handle_user_turn_streaming(
                     session=session_schema,
-                    user_text=request.message,
+                    user_text=chat_request.message,
                     context=context,
                     chat_history=chat_history
                 ):
