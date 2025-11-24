@@ -134,16 +134,27 @@ def get_completion_streak(
     sorted_dates = sorted(completion_dates, reverse=True)
     
     # Calcular racha
+    # Calcular racha
     streak = 0
     today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
     
-    for i, date in enumerate(sorted_dates):
-        expected_date = today - timedelta(days=i)
-        
-        if date == expected_date:
-            streak += 1
-        else:
-            break
+    # Si el último ejercicio no fue hoy ni ayer, la racha es 0
+    if today not in sorted_dates and yesterday not in sorted_dates:
+        return 0
+
+    # Determinar fecha de inicio para contar hacia atrás
+    if today in sorted_dates:
+        streak = 1
+        current_date = yesterday
+    else: # Si el último fue ayer
+        streak = 1
+        current_date = yesterday - timedelta(days=1)
+
+    # Contamos hacia atrás
+    while current_date in sorted_dates:
+        streak += 1
+        current_date -= timedelta(days=1)
     
     return streak
 
